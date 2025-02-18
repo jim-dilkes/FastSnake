@@ -532,8 +532,8 @@ class SnakeGame:
             if len(alive_snakes) <= 1:
                 self.end_game("All but one snake are dead.")
 
-        print(f"Finished round {self.round_number}. Alive: {alive_snakes}, Scores: {self.scores}")
-        time.sleep(.3)
+            print(f"Finished round {self.round_number}. Alive: {alive_snakes}, Scores: {self.scores}")
+            time.sleep(.3)
 
     def serialize_history(self, history):
         """
