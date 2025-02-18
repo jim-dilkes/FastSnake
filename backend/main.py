@@ -121,6 +121,7 @@ class Player:
     """
     def __init__(self, snake_id: str):
         self.snake_id = snake_id
+        self.move_history = []
 
     def get_move(self, game_state: GameState) -> str:
         raise NotImplementedError
@@ -130,6 +131,7 @@ class RandomPlayer(Player):
     """
     Example: a random AI that picks a valid direction that avoids walls and self-collisions.
     """
+
     def get_move(self, game_state: GameState) -> str:
         snake_positions = game_state.snake_positions[self.snake_id]
         head_x, head_y = snake_positions[0]
@@ -160,9 +162,17 @@ class RandomPlayer(Player):
         
         # If no valid moves, just return a random move (we'll die anyway)
         if not valid_moves:
-            return random.choice(list(VALID_MOVES))
+            direction = random.choice(list(VALID_MOVES))
+        else: 
+            direction = random.choice(valid_moves)
+        
+        move_data = {
+            "direction": direction,
+            "rationale": "Random choice"
+        }
             
-        return random.choice(valid_moves)
+        self.move_history.append({self.snake_id: move_data})
+        return move_data
 
 
 class LLMPlayer(Player):
@@ -172,7 +182,6 @@ class LLMPlayer(Player):
     def __init__(self, snake_id: str, model: str = "gpt-4o-mini"):
         super().__init__(snake_id)
         self.model = model
-        self.move_history = []
         # Instantiate the correct provider based on the model name.
         self.provider = create_llm_provider(model)
 
