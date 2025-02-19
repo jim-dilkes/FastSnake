@@ -9,7 +9,7 @@ from openai import OpenAI
 import json
 import uuid
 import argparse
-from llm_providers import create_llm_provider
+from .llm_providers import create_llm_provider
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
@@ -78,7 +78,7 @@ class GameState:
         Now with (0,0) at bottom left and x-axis labels at bottom
         """
         # Create empty board
-        board = [['.' for _ in range(self.width)] for _ in range(self.height)]
+        board = [['#' for _ in range(self.width)] for _ in range(self.height)]
         
         # Place apples
         for ax, ay in self.apples:
@@ -263,6 +263,7 @@ class SnakeGame:
         self.height = height
         self.snakes: Dict[str, Snake] = {}
         self.players: Dict[str, Player] = {}
+        self.external_snakes: Set[str] = set()  # Track which snakes are externally controlled
         self.scores: Dict[str, int] = {}
         self.round_number = 0
         self.max_rounds = max_rounds
@@ -292,16 +293,28 @@ class SnakeGame:
             cell = self._random_free_cell()
             self.apples.append(cell)
 
-    def add_snake(self, snake_id: str, player: Player):
+    def add_snake(self, snake_id: str, player: Optional[Player] = None, is_external: bool = False):
+        """
+        Add a snake to the game.
+        Args:
+            snake_id: Unique identifier for the snake
+            player: Player instance that controls the snake (None if externally controlled)
+            is_external: Whether this snake is controlled externally through run_round
+        """
         if snake_id in self.snakes:
             raise ValueError(f"Snake with id {snake_id} already exists.")
         
         positions = self._random_free_cell()
 
         self.snakes[snake_id] = Snake([positions])
-        self.players[snake_id] = player
+        if not is_external:
+            if player is None:
+                raise ValueError("Non-external snakes must have a player")
+            self.players[snake_id] = player
+        else:
+            self.external_snakes.add(snake_id)
         self.scores[snake_id] = 0
-        print(f"Added snake '{snake_id}' ({player.model if hasattr(player, 'model') else player.__class__.__name__}) at {positions}.")
+        print(f"Added snake '{snake_id}' ({'external' if is_external else player.__class__.__name__}) at {positions}.")
 
     def set_apples(self, apple_positions: List[Tuple[int,int]]):
         """
@@ -363,12 +376,15 @@ class SnakeGame:
         
         # We'll limit max_workers to the number of alive snakes (or just len of all snakes).
         # If you have many snakes, you can set a higher or lower limit based on preference.
-        alive_snakes = [sid for sid, s in game.snakes.items() if s.alive]
+        alive_internal_snakes = [sid for sid, s in game.snakes.items() if s.alive and sid not in self.external_snakes]
 
-        with ThreadPoolExecutor(max_workers=len(alive_snakes)) as executor:
+        if len(alive_internal_snakes) == 0:
+            return {}
+
+        with ThreadPoolExecutor(max_workers=len(alive_internal_snakes)) as executor:
             # Schedule all get_move calls
             futures = {}
-            for snake_id in alive_snakes:
+            for snake_id in alive_internal_snakes:
                 player = game.players[snake_id]
                 futures[executor.submit(player.get_move, state_snapshot)] = snake_id
             
@@ -384,15 +400,11 @@ class SnakeGame:
 
         return round_moves
 
-    def run_round(self):
+    def run_round(self, external_moves: Optional[Dict[str, str]] = None):
         """
-        Execute one round:
-          1) If game is over, do nothing
-          2) Ask each alive snake for their move
-          3) Apply moves simultaneously
-          4) Handle apple-eating (grow + score)
-          5) Check collisions
-          6) Possibly end game if round limit reached or 1 snake left, etc.
+        Execute one round with support for external moves.
+        Args:
+            external_moves: Dictionary mapping snake_id to move direction for externally controlled snakes
         """
         if self.game_over:
             print("Game is already over. No more rounds.")
@@ -400,8 +412,31 @@ class SnakeGame:
         
         self.print_board()
 
-        # --- PARALLEL GATHER OF MOVES ---
-        round_moves = self.gather_moves_in_parallel(self)
+        # Validate external moves
+        if external_moves is None:
+            external_moves = {}
+        for snake_id in external_moves:
+            if snake_id not in self.external_snakes:
+                raise ValueError(f"Move provided for non-external snake: {snake_id}")
+        for snake_id in self.external_snakes:
+            if snake_id not in external_moves:
+                raise ValueError(f"No move provided for external snake: {snake_id}")
+            
+        alive_external_snakes = [sid for sid, s in self.snakes.items() if s.alive and sid in self.external_snakes]
+
+        # Format external moves
+        round_moves = {
+            sid: {
+                "move": external_moves[sid],
+                "rationale": "External move"
+            }
+            for sid in alive_external_snakes
+        }
+        
+        # Get moves from internal players using existing function
+        internal_moves = self.gather_moves_in_parallel(self)
+        round_moves.update(internal_moves)
+
         # Store the moves of this round
         self.move_history.append(round_moves)
 
@@ -434,7 +469,7 @@ class SnakeGame:
                 cell_counts.setdefault(head_pos, []).append(sid)
 
         # Check wall collisions and collisions with any snake body (including tails).
-        # Here, we use the current board state (i.e. each snake’s full positions list) as the source of occupied cells.
+        # Here, we use the current board state (i.e. each snake's full positions list) as the source of occupied cells.
         for sid, head_pos in new_heads.items():
             snake = self.snakes[sid]
             if not snake.alive or head_pos is None:
@@ -451,7 +486,7 @@ class SnakeGame:
             # 3b. Collision with any snake's body, including tails.
             # (Note: We do not exclude any part of the body now.)
             for other_id, other_snake in self.snakes.items():
-                # If the new head lands on any occupied cell from the current state, it’s a collision.
+                # If the new head lands on any occupied cell from the current state, it's a collision.
                 if head_pos in other_snake.positions:
                     snake.alive = False
                     snake.death_reason = 'body_collision'
@@ -525,6 +560,8 @@ class SnakeGame:
         self.round_number += 1
         self.record_history()
 
+
+        alive_snakes = [s_id for s_id in self.snakes if self.snakes[s_id].alive]
         if self.round_number >= self.max_rounds:
             self.end_game("Reached max rounds.")
         else:
@@ -673,7 +710,8 @@ def main():
     for i, model in enumerate(args.models, start=1):
         game.add_snake(
             snake_id=str(i),
-            player=LLMPlayer(str(i), model=model)
+            player=LLMPlayer(str(i), model=model),
+            is_external=False
         )
 
     # Record initial state and run the game
