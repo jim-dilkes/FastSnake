@@ -4,7 +4,7 @@ import gym
 from gym import spaces
 import numpy as np
 from typing import Optional, Dict, Any, Tuple, List
-from core import FastSnake, UP, DOWN, LEFT, RIGHT
+from .core import FastSnake, UP, DOWN, LEFT, RIGHT
 
 class FastSnakeEnv(gym.Env):
     metadata = {'render_modes': ['human', 'ansi', 'rgb_array']}
