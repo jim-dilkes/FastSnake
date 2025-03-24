@@ -87,68 +87,70 @@ class OllamaProvider(LLMProviderInterface):
 class LocalCheckpointProvider(LLMProviderInterface):
     def __init__(self, checkpoint_path: str):
         self.checkpoint_path = checkpoint_path
-        # Load the base model and tokenizer
         self.model = None
         self.tokenizer = None
+        self.device = self._get_available_device()
         self._load_model()
     
+    def _get_available_device(self) -> str:
+        """
+        Determine the best available device for model inference.
+        Returns 'cuda' if GPU is available, 'mps' if Apple Silicon is available,
+        otherwise returns 'cpu'.
+        """
+        if torch.cuda.is_available():
+            return 'cuda'
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            return 'mps'
+        return 'cpu'
+
     def _load_model(self):
         from pathlib import Path
         import json
         
-        # Convert checkpoint_path to Path object
         checkpoint_path = Path(self.checkpoint_path)
-        
-        # Find config file in parent directory
         config_path = checkpoint_path.parent.parent / "config.json"
+        
         if not config_path.exists():
             raise FileNotFoundError(f"Config file not found: {config_path}")
         
-        # Load config
         with open(config_path, 'r') as f:
             config = json.load(f)
         
-        # Get base model name from config
         base_model_name = config['model']['name']
         if not base_model_name:
             raise ValueError("Base model name not found in config")
-        
-        # Load metrics file to get additional info if available
-        metrics_file = checkpoint_path / "metrics.json"
-        metrics = {}
-        if metrics_file.exists():
-            with open(metrics_file, 'r') as f:
-                metrics = json.load(f)
-        
-        print(f"Loading model from {checkpoint_path}, base model name: {base_model_name}")
 
-        # Load the base model and tokenizer with matching configuration
         self.model = AutoModelForCausalLM.from_pretrained(
             base_model_name,
             torch_dtype="auto",
-            trust_remote_code=True
+            trust_remote_code=True,
         )
+        self.model.to(self.device)
+
         self.tokenizer = AutoTokenizer.from_pretrained(
             base_model_name,
             padding_side="left",
             trust_remote_code=True
         )
         
-        # Load and apply the LoRA weights
         self.model = PeftModel.from_pretrained(
             self.model,
             os.path.join(self.checkpoint_path, "model"),
             is_trainable=False
-        )
+        ).to(self.device)
+        
         self.model.eval()
+        
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
     
     def get_response(self, model: str, prompt: str) -> str:
         if self.model is None or self.tokenizer is None:
             self._load_model()
         
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         
-        print("Generating response...")
         outputs = self.model.generate(
             **inputs,
             max_new_tokens=64,
@@ -160,7 +162,6 @@ class LocalCheckpointProvider(LLMProviderInterface):
         )
         
         response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        print(f"Response generated: {response}")
         return response[len(prompt):].strip()
 
 def create_llm_provider(model: str) -> LLMProviderInterface:
