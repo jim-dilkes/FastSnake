@@ -161,22 +161,18 @@ class SnakeGameEnv(gym.Env):
         return rewards
     
     def game_state_text(self):
-            game_state = self.game.get_current_state()
-            apples_str = ", ".join(str(a) for a in game_state.apples)
-            snake_id = self.external_snake_ids[0] 
-            snake_head_num = 1
-            return (
-                f"The board size is {game_state.width}x{game_state.height}. Normal (X, Y) coordinates are used. Coordinates range from (0, 0) at bottom left to ({game_state.width-1}, {game_state.height-1}) at top right.\n"
-                f"Apples at: {apples_str}\n\n"
-                f"Your snake ID: {snake_head_num} which is currently positioned at {game_state.snake_positions[snake_id][0]}\n\n"
-                f"Enemy snakes positions:\n" + "\n".join([f"* Snake #{i} is at position {pos[0]}" for i, (sid, pos) in enumerate(game_state.snake_positions.items(), start=1) if sid != snake_id]) + "\n\n"
-                f"Game state:\n"
-                f"{game_state.print_board()}\n\n"
-                # f"--Your last move information:--\n\n"
-                # f"Direction: {self.move_history[-1][self.snake_id]['direction'] if self.move_history else 'None'}\n"
-                # f"Rationale: {self.move_history[-1][self.snake_id]['rationale'] if self.move_history else 'None'}\n\n"
-                # f"--End of your last move information.--\n\n"
-            )
+        game_state = self.game.get_current_state()
+        apples_str = ", ".join(str(a) for a in game_state.apples)
+        snake_id = self.external_snake_ids[0] 
+        snake_head_num = 1
+        return (
+            f"The board size is {game_state.width}x{game_state.height}. Normal (X, Y) coordinates are used. Coordinates range from (0, 0) at bottom left to ({game_state.width-1}, {game_state.height-1}) at top right.\n"
+            f"Apples at: {apples_str}\n\n"
+            f"Your snake ID: {snake_head_num} which is currently positioned at {game_state.snake_positions[snake_id][0]} with body at {game_state.snake_positions[snake_id][1:]}\n\n"
+            f"Enemy snakes positions:\n" + "\n".join([f"* Snake #{i} is at position {pos[0]} with body at {pos[1:]}" for i, (sid, pos) in enumerate(game_state.snake_positions.items(), start=1) if sid != snake_id]) + "\n\n"
+            f"Game state:\n"
+            f"{game_state.print_board()}\n\n"
+        )
     
     def render(self, mode: str = 'human'):
         if mode == 'human' or mode == 'ansi':
