@@ -5,6 +5,9 @@ import google.generativeai as genai  # Add this import
 from together import Together
 from ollama import chat
 from ollama import ChatResponse
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel
+import torch
 
 class LLMProviderInterface:
     """
@@ -81,12 +84,92 @@ class OllamaProvider(LLMProviderInterface):
         ])
         return response.message.content.strip()
 
+class LocalCheckpointProvider(LLMProviderInterface):
+    def __init__(self, checkpoint_path: str):
+        self.checkpoint_path = checkpoint_path
+        # Load the base model and tokenizer
+        self.model = None
+        self.tokenizer = None
+        self._load_model()
+    
+    def _load_model(self):
+        from pathlib import Path
+        import json
+        
+        # Convert checkpoint_path to Path object
+        checkpoint_path = Path(self.checkpoint_path)
+        
+        # Find config file in parent directory
+        config_path = checkpoint_path.parent.parent / "config.json"
+        if not config_path.exists():
+            raise FileNotFoundError(f"Config file not found: {config_path}")
+        
+        # Load config
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        
+        # Get base model name from config
+        base_model_name = config['model']['name']
+        if not base_model_name:
+            raise ValueError("Base model name not found in config")
+        
+        # Load metrics file to get additional info if available
+        metrics_file = checkpoint_path / "metrics.json"
+        metrics = {}
+        if metrics_file.exists():
+            with open(metrics_file, 'r') as f:
+                metrics = json.load(f)
+        
+        print(f"Loading model from {checkpoint_path}, base model name: {base_model_name}")
+
+        # Load the base model and tokenizer with matching configuration
+        self.model = AutoModelForCausalLM.from_pretrained(
+            base_model_name,
+            torch_dtype="auto",
+            trust_remote_code=True
+        )
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            base_model_name,
+            padding_side="left",
+            trust_remote_code=True
+        )
+        
+        # Load and apply the LoRA weights
+        self.model = PeftModel.from_pretrained(
+            self.model,
+            os.path.join(self.checkpoint_path, "model"),
+            is_trainable=False
+        )
+        self.model.eval()
+    
+    def get_response(self, model: str, prompt: str) -> str:
+        if self.model is None or self.tokenizer is None:
+            self._load_model()
+        
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        
+        print("Generating response...")
+        outputs = self.model.generate(
+            **inputs,
+            max_new_tokens=64,
+            do_sample=True,
+            temperature=1.5,
+            top_p=0.8,
+            pad_token_id=self.tokenizer.pad_token_id,
+            eos_token_id=self.tokenizer.eos_token_id
+        )
+        
+        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        print(f"Response generated: {response}")
+        return response[len(prompt):].strip()
+
 def create_llm_provider(model: str) -> LLMProviderInterface:
     """
     Factory function for creating an LLM provider instance.
     If any substring in the openai_substrings list is found in the model name (case-insensitive),
     returns an instance of OpenAIProvider.
     If any substring in the anthropic_substrings list is found, returns an instance of AnthropicProvider.
+    If the model starts with 'local:', returns a LocalCheckpointProvider.
     Otherwise, raises a ValueError.
     """
     model_lower = model.lower()
@@ -96,7 +179,15 @@ def create_llm_provider(model: str) -> LLMProviderInterface:
     together_substrings = ["meta-llama", "deepseek", "Gryphe", "microsoft", "mistralai", "NousResearch", "nvidia", "Qwen", "upstage"]
     ollama_substrings = ["ollama-"]
 
-    if any(substr.lower() in model_lower for substr in openai_substrings):
+    if model_lower.startswith("local:"):
+        checkpoint_path = model[6:]  # Remove "local:" prefix
+        # Convert relative path to absolute path based on script location
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        checkpoint_path = os.path.abspath(os.path.join(script_dir, checkpoint_path))
+        if not os.path.exists(checkpoint_path):
+            raise ValueError(f"Checkpoint path does not exist: {checkpoint_path}")
+        return LocalCheckpointProvider(checkpoint_path=checkpoint_path)
+    elif any(substr.lower() in model_lower for substr in openai_substrings):
         if not os.getenv("OPENAI_API_KEY"):
             raise ValueError("OPENAI_API_KEY is not set in the environment variables.")
         return OpenAIProvider(api_key=os.getenv("OPENAI_API_KEY"))

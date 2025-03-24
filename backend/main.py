@@ -9,7 +9,7 @@ from openai import OpenAI
 import json
 import uuid
 import argparse
-from .llm_providers import create_llm_provider
+from llm_providers import create_llm_provider
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
@@ -230,19 +230,22 @@ class LLMPlayer(Player):
             "\n".join([f"* Snake #{sid} is at position {pos[0]} with body at {pos[1:]}" for sid, pos in game_state.snake_positions.items() if sid != self.snake_id]) + "\n\n"
             f"Board state:\n"
             f"{game_state.print_board()}\n\n"
-            f"--Your last move information:--\n\n"
-            f"Direction: {self.move_history[-1][self.snake_id]['direction'] if self.move_history else 'None'}\n"
-            f"Rationale: {self.move_history[-1][self.snake_id]['rationale'] if self.move_history else 'None'}\n\n"
-            f"--End of your last move information.--\n\n"
+            # f"--Your last move information:--\n\n"
+            # f"Direction: {self.move_history[-1][self.snake_id]['direction'] if self.move_history else 'None'}\n"
+            # f"Rationale: {self.move_history[-1][self.snake_id]['rationale'] if self.move_history else 'None'}\n\n"
+            # f"--End of your last move information.--\n\n"
             "Rules:\n"
             "1) If you move onto an apple, you grow and gain 1 point.\n"
             "2) If you run into a wall (outside the range of the listed coordinates), another snake, or yourself (like go backwards), you die.\n"
             "3) The goal is to have the most points by the end.\n\n"
-            "Decreasing your x coordinate is to the left, increasing your x coordinate is to the right.\n"
-            "Decreasing your y coordinate is down, increasing your y coordinate is up.\n"
-            "You may think out loud first then respond with the direction.\n"
-            "You may also state a strategy you want to tell yourself next turn.\n"
-            "End your response with your decided next move: UP, DOWN, LEFT, or RIGHT.\n"
+            # "Decreasing your x coordinate is to the left, increasing your x coordinate is to the right.\n"
+            # "Decreasing your y coordinate is down, increasing your y coordinate is up.\n"
+            # "You may think out loud first then respond with the direction.\n"
+            # "You may also state a strategy you want to tell yourself next turn.\n"
+            # "End your response with your decided next move: UP, DOWN, LEFT, or RIGHT.\n"
+            "[Response Template]\n"
+            "<plan>{describe plan in prose here}</plan>\n"
+            "<action>{UP/DOWN/LEFT/RIGHT}</action>\n"
         )
         print(f"----------Prompt:\n\n {prompt}\n\n------------")
         return prompt
@@ -687,7 +690,7 @@ def main():
         description="Run Snake Game with two distinctive LLM models as players."
     )
     parser.add_argument("--models", type=str, nargs='+', required=True,
-                        help="2 or more model IDs for each snake (e.g. 'gpt-4o-mini-2024-07-18 llama3-8b-8192')")
+                        help="2 or more model IDs for each snake (e.g. 'gpt-4o-mini-2024-07-18 llama3-8b-8192' or 'random')")
     parser.add_argument("--width", type=int, required=False, default=10,
                         help="Width of the board from 0 to N")
     parser.add_argument("--height", type=int, required=False, default=10,
@@ -706,13 +709,20 @@ def main():
     # Create a game with a 5x5 board and 100 rounds (you can adjust these as needed)
     game = SnakeGame(width=args.width, height=args.height, max_rounds=args.max_rounds, num_apples=args.num_apples)
 
-    # Add two snakes with LLM players using the specified models
+    # Add snakes with either LLM players or RandomPlayer based on the model specification
     for i, model in enumerate(args.models, start=1):
-        game.add_snake(
-            snake_id=str(i),
-            player=LLMPlayer(str(i), model=model),
-            is_external=False
-        )
+        if model.lower() == "random":
+            game.add_snake(
+                snake_id=str(i),
+                player=RandomPlayer(str(i)),
+                is_external=False
+            )
+        else:
+            game.add_snake(
+                snake_id=str(i),
+                player=LLMPlayer(str(i), model=model),
+                is_external=False
+            )
 
     # Record initial state and run the game
     game.record_history()
