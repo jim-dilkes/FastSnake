@@ -9,7 +9,7 @@ from openai import OpenAI
 import json
 import uuid
 import argparse
-from llm_providers import create_llm_provider
+from .llm_providers import create_llm_provider
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
@@ -71,7 +71,7 @@ class GameState:
     def print_board(self) -> str:
         """
         Returns a string representation of the board with:
-        . = empty space
+        # = empty space
         A = apple
         T = snake tail
         1,2,3... = snake head (showing player number)
@@ -222,8 +222,19 @@ class LLMPlayer(Player):
         # Summarize the multiple apples
         apples_str = ", ".join(str(a) for a in game_state.apples)
         prompt = (
-            f"You are controlling a snake in a multi-apple Snake game. "
+            "[Instruction]\n"
+            f"You are controlling a snake in a multi-apple Snake game. The apples are rolling down a hill from LEFT to RIGHT.\n"
+            "Rules:\n"
+            "1) If you move onto an apple, you grow and gain 1 point.\n"
+            "2) If you run into a wall (outside the range of the listed coordinates), another snake, or yourself (like go backwards), you die.\n"
+            "3) The goal is to have the most points by the end.\n\n"
             f"The board size is {game_state.width}x{game_state.height}. Normal X,Y coordinates are used. Coordinates range from (0,0) at bottom left to ({game_state.width-1},{game_state.height-1}) at top right.\n"
+            "Respond using tags and terminate after the <action> tag:\n"
+            "<plan>Your observation and plan to reach the goal</plan>\n"
+            "<action>UP/DOWN/LEFT/RIGHT</action>\n"
+            "IMPORTANT INSTRUCTION: The apples are rolling from LEFT to RIGHT. First move towards the apple, then move to the right of the apple to catch it.\n"
+            "For example, if an apple is at (0, 0) you must move to (1, 0) to catch it.\n"
+            "[Input]\n"
             f"Apples at: {apples_str}\n\n"
             f"Your snake ID: {self.snake_id} which is currently positioned at {game_state.snake_positions[self.snake_id][0]} with body at {game_state.snake_positions[self.snake_id][1:]}\n\n"
             f"Enemy snakes positions:\n" + 
@@ -234,10 +245,6 @@ class LLMPlayer(Player):
             # f"Direction: {self.move_history[-1][self.snake_id]['direction'] if self.move_history else 'None'}\n"
             # f"Rationale: {self.move_history[-1][self.snake_id]['rationale'] if self.move_history else 'None'}\n\n"
             # f"--End of your last move information.--\n\n"
-            "Rules:\n"
-            "1) If you move onto an apple, you grow and gain 1 point.\n"
-            "2) If you run into a wall (outside the range of the listed coordinates), another snake, or yourself (like go backwards), you die.\n"
-            "3) The goal is to have the most points by the end.\n\n"
             # "Decreasing your x coordinate is to the left, increasing your x coordinate is to the right.\n"
             # "Decreasing your y coordinate is down, increasing your y coordinate is up.\n"
             # "You may think out loud first then respond with the direction.\n"
@@ -246,6 +253,8 @@ class LLMPlayer(Player):
             "[Response Template]\n"
             "<plan>{describe plan in prose here}</plan>\n"
             "<action>{UP/DOWN/LEFT/RIGHT}</action>\n"
+            "Remember, the apples are rolling from LEFT to RIGHT. If an apple is at (0, 0) you must move to (1, 0) to catch it. \n"
+            "Your response:\n"
         )
         print(f"----------Prompt:\n\n {prompt}\n\n------------")
         return prompt
