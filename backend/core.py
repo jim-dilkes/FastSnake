@@ -15,10 +15,10 @@ class FastSnake:
     
     def __init__(self, width: int, height: int, num_apples: int = 1, max_rounds: int = 100):
         # Board representation constants
-        self.EMPTY = 0
-        self.SNAKE_BODY = 1
-        self.APPLE = 2
-        self.SNAKE_HEAD = 3
+        self.EMPTY = 100
+        self.SNAKE_BODY = 101
+        self.APPLE = 102
+        self.SNAKE_HEAD = 103
         
         self.width = width
         self.height = height
@@ -38,7 +38,7 @@ class FastSnake:
     
     def reset(self):
         """Reset the game state."""
-        self.board = np.zeros((self.height, self.width), dtype=np.int8)
+        self.board = np.full((self.height, self.width), self.EMPTY, dtype=np.int8)
         self.round_number = 0
         self.game_over = False
         
@@ -104,8 +104,11 @@ class FastSnake:
                 self.board[y, x] = self.SNAKE_BODY
                 
             # Place head
-            hx, hy = snake['positions'][0]
-            self.board[hy, hx] = self.SNAKE_HEAD
+            positions_list = list(snake['positions'])
+            if positions_list: # Check if snake has any positions
+                hx, hy = positions_list[0]
+                if 0 <= hy < self.height and 0 <= hx < self.width: # Check bounds
+                    self.board[hy, hx] = self.SNAKE_HEAD
     
     def step(self, actions: Dict[str, int]) -> Tuple[Dict[str, np.ndarray], Dict[str, float], bool, dict]:
         """
@@ -223,19 +226,43 @@ class FastSnake:
         return self.board.copy()
     
     def render_text(self) -> str:
-        """Render the game state as text."""
-        chars = {
-            self.EMPTY: '.',
-            self.SNAKE_BODY: 'o',
-            self.SNAKE_HEAD: 'O',
-            self.APPLE: 'A'
-        }
-        
-        lines = []
-        for y in range(self.height-1, -1, -1):
-            line = [chars[cell] for cell in self.board[y]]
-            lines.append(f"{y:2d} {' '.join(line)}")
-        
-        # Add x-axis labels
-        lines.append("   " + " ".join(str(x) for x in range(self.width)))
-        return "\n".join(lines)
+        """
+        Returns a string representation of the board with:
+        # = empty space
+        A = apple
+        T = snake tail
+        1,2,3... = snake head (showing player number based on order in self.snakes)
+        Now with (0,0) at bottom left and x-axis labels at bottom
+        """
+        # Create empty board
+        board = [['#' for _ in range(self.width)] for _ in range(self.height)]
+
+        # Place apples
+        for ax, ay in self.apples:
+            if 0 <= ay < self.height and 0 <= ax < self.width:
+                board[ay][ax] = 'A'
+
+        # Place snakes
+        for i, (snake_id, snake_data) in enumerate(self.snakes.items(), start=1):
+            if not snake_data['alive']:
+                continue
+
+            positions = snake_data['positions']
+            # Place snake body
+            for pos_idx, (x, y) in enumerate(positions):
+                if 0 <= y < self.height and 0 <= x < self.width:
+                    if pos_idx == 0:  # Head
+                        board[y][x] = str(i)  # Use snake number (1, 2, 3...) for head
+                    else:  # Body/tail
+                        board[y][x] = 'T'
+
+        # Build the string representation
+        result = []
+        # Print rows in reverse order (bottom to top)
+        for y in range(self.height - 1, -1, -1):
+            result.append(f"{y:2d} {' '.join(board[y])}")
+
+        # Add x-axis labels at the bottom
+        result.append("   " + " ".join(str(i) for i in range(self.width)))
+
+        return "\n".join(result)

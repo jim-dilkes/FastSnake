@@ -5,6 +5,7 @@ from gym import spaces
 import numpy as np
 from typing import Optional, Dict, Any, Tuple, List
 from .core import FastSnake, UP, DOWN, LEFT, RIGHT
+import random # Import random
 
 class FastSnakeEnv(gym.Env):
     metadata = {'render_modes': ['human', 'ansi', 'rgb_array']}
@@ -117,15 +118,65 @@ class FastSnakeEnv(gym.Env):
             actions = {self.external_snake_ids[0]: action}
         else:
             actions = {
-                snake_id: act 
+                snake_id: act
                 for snake_id, act in zip(self.external_snake_ids, action)
             }
-        
-        # Add random actions for random snakes
+
+        # Add actions for random snakes (matching RandomPlayer logic)
         for snake_id in self.random_snake_ids:
             if self.game.snakes[snake_id]['alive']:
-                actions[snake_id] = np.random.randint(4)
-        
+                # actions[snake_id] = np.random.randint(4) # Old truly random logic
+
+                # New logic: Choose random valid move (avoid walls/self)
+                snake_data = self.game.snakes[snake_id]
+                positions = snake_data['positions']
+                head_x, head_y = positions[0]
+                possible_actions = { # Map action const to potential new head pos
+                    UP:    (head_x, head_y + 1),
+                    DOWN:  (head_x, head_y - 1),
+                    LEFT:  (head_x - 1, head_y),
+                    RIGHT: (head_x + 1, head_y)
+                }
+
+                valid_actions = []
+                # Convert deque to list once for slicing
+                positions_list = list(positions)
+                # Only exclude tail if snake has more than 2 segments (head + body)
+                body_to_check = positions_list[:-1] if len(positions_list) > 2 else positions_list
+
+                for action, (new_x, new_y) in possible_actions.items():
+                    # Check wall collisions
+                    if not (0 <= new_x < self.width and 0 <= new_y < self.height):
+                        print(f"RandomPlayer would hit a wall at {new_x}, {new_y}")
+                        continue
+
+                    # Check self collisions (excluding tail)
+                    if (new_x, new_y) in body_to_check:
+                        print(f"RandomPlayer would hit itself at {new_x}, {new_y}")
+                        continue
+
+                    # Check collisions with other snakes (Optional - RandomPlayer doesn't do this)
+                    # occupied_by_others = False
+                    # for other_id, other_snake in self.game.snakes.items():
+                    #     if other_id != snake_id and other_snake['alive']:
+                    #         if (new_x, new_y) in other_snake['positions']:
+                    #             occupied_by_others = True
+                    #             break
+                    # if occupied_by_others:
+                    #     continue
+
+                    valid_actions.append(action)
+
+                # Choose action
+                if valid_actions:
+                    chosen_action = random.choice(valid_actions)
+                else:
+                    # Trapped, choose a random action (likely dying)
+                    print(f"RandomPlayer {snake_id} is trapped, choosing a random action")
+                    chosen_action = random.choice(list(possible_actions.keys()))
+
+                actions[snake_id] = chosen_action
+
         # Execute game step
         observations, rewards, done, info = self.game.step(actions)
         
@@ -159,7 +210,7 @@ class FastSnakeEnv(gym.Env):
             
             # Penalty for dying
             if not self.game.snakes[snake_id]['alive']:
-                reward -= 1.0
+                reward -= 2.0
             
             # Small penalty for each step to encourage efficient paths
             reward -= 0.01
@@ -205,31 +256,57 @@ class FastSnakeEnv(gym.Env):
             raise NotImplementedError("RGB array rendering not implemented yet")
         else:
             raise ValueError(f"Unsupported render mode: {mode}")
-    
+        
     def env_state_text(self) -> str:
-        """Get a text representation of the game state."""
-        snake_id = self.external_snake_ids[0]
-        snake_head = self.game.snakes[snake_id]['positions'][0]
+        """Compatibility"""
+        return self.game_state_text()
+    
+    def game_state_text(self) -> str:
+        """Get a text representation of the game state, matching SnakeGameEnv format."""
+        if not self.game or not self.external_snake_ids:
+            return "Game not initialized or no external snake."
+
+        your_snake_id = self.external_snake_ids[0]
+
+        # Create mapping from snake_id to display number (1, 2, ...)
+        snake_id_to_number = {sid: i for i, sid in enumerate(self.game.snakes.keys(), start=1)}
+        your_snake_number = snake_id_to_number.get(your_snake_id, '?') # Should always find it
+
+        # Ensure your snake exists in the game data
+        if your_snake_id not in self.game.snakes or not self.game.snakes[your_snake_id]['alive']:
+            your_snake_head_str = "(Dead)"
+            your_snake_body_str = "[]"
+        else:
+            your_snake_positions = list(self.game.snakes[your_snake_id]['positions'])
+            your_snake_head = your_snake_positions[0]
+            your_snake_body = your_snake_positions[1:]
+            your_snake_head_str = str(your_snake_head)
+            your_snake_body_str = str(your_snake_body)
+
+        # Get apple positions
         apple_positions = self.game.apples
-        
-        # Create the description
         apples_str = ", ".join(str(a) for a in apple_positions)
-        enemy_snakes = [
-            (i, sid, self.game.snakes[sid]['positions'][0])
-            for i, sid in enumerate(self.game.snakes.keys(), start=1)
-            if sid != snake_id and self.game.snakes[sid]['alive']
-        ]
-        
-        enemy_str = "\n".join([
-            f"* Snake #{i} is at position {pos}"
-            for i, _, pos in enemy_snakes
-        ])
-        
+
+        # Get enemy snake positions
+        enemy_strs = []
+        for sid, snake_data in self.game.snakes.items():
+            if sid != your_snake_id and snake_data['alive']:
+                enemy_number = snake_id_to_number[sid]
+                positions = list(snake_data['positions'])
+                head_pos = positions[0]
+                body_pos = positions[1:]
+                enemy_strs.append(f"* Snake #{enemy_number} is at position {head_pos} with body at {body_pos}")
+        enemy_str = "\n".join(enemy_strs)
+
+        # Get board representation using the updated render_text
+        board_str = self.game.render_text()
+
+        # Construct the final string
         return (
-            f"The board size is {self.width}x{self.height}. Normal (X,Y) coordinates are used. "
-            f"Coordinates range from (0,0) at bottom left to ({self.width-1},{self.height-1}) at top right.\n"
+            f"The board size is {self.width}x{self.height}. Normal (X, Y) coordinates are used. Coordinates range from (0, 0) at bottom left to ({self.width-1}, {self.height-1}) at top right.\n"
             f"Apples at: {apples_str}\n\n"
-            f"Your snake ID: 1 which is currently positioned at {snake_head}\n\n"
+            f"Your snake ID: {your_snake_number} which is currently positioned at {your_snake_head_str} with body at {your_snake_body_str}\n\n"
             f"Enemy snakes positions:\n{enemy_str}\n\n"
-            f"Game state:\n{self.game.render_text()}\n\n"
+            f"Game state:\n"
+            f"{board_str}\n\n"
         )
