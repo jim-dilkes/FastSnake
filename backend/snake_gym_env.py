@@ -6,7 +6,13 @@ from .main import UP, DOWN, LEFT, RIGHT, RandomPlayer, SnakeGame
 
 class SnakeGameEnv(gym.Env):
     metadata = {'render_modes': ['human', 'ansi', 'rgb_array']}
-    
+    STRING_ACTION_MAP = {
+        "up": 0,
+        "down": 1,
+        "left": 2,
+        "right": 3
+    }
+
     def __init__(self, 
                  width: int = 10, 
                  height: int = 10, 
@@ -174,6 +180,9 @@ class SnakeGameEnv(gym.Env):
             f"{game_state.print_board()}\n\n"
         )
     
+    def env_state_text(self):
+        return self.game_state_text()
+
     def render(self, mode: str = 'human'):
         if mode == 'human' or mode == 'ansi':
             return self.game.get_current_state().print_board()
