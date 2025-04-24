@@ -1,0 +1,140 @@
+{
+  "metadata": {
+    "game_id": "570be9da-660b-40e9-a7f1-bb3bdeb117c5",
+    "start_time": "2025-04-02T12:14:27.167741",
+    "end_time": "2025-04-02T12:15:50.245786",
+    "models": {
+      "1": "step_720",
+      "2": "step_720"
+    },
+    "game_result": {
+      "1": "won",
+      "2": "lost"
+    },
+    "final_scores": {
+      "1": 0,
+      "2": 0
+    },
+    "death_info": {
+      "2": {
+        "reason": "wall",
+        "round": 0
+      }
+    },
+    "max_rounds": 30,
+    "actual_rounds": 0
+  },
+  "rounds": [
+    {
+      "round_number": 0,
+      "snake_positions": {
+        "1": [
+          [
+            6,
+            9
+          ]
+        ],
+        "2": [
+          [
+            9,
+            1
+          ]
+        ]
+      },
+      "alive": {
+        "1": true,
+        "2": true
+      },
+      "scores": {
+        "1": 0,
+        "2": 0
+      },
+      "width": 10,
+      "height": 10,
+      "apples": [
+        [
+          5,
+          4
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          2,
+          4
+        ]
+      ],
+      "move_history": []
+    },
+    {
+      "round_number": 0,
+      "snake_positions": {
+        "1": [
+          [
+            6,
+            9
+          ]
+        ],
+        "2": [
+          [
+            9,
+            1
+          ]
+        ]
+      },
+      "alive": {
+        "1": true,
+        "2": false
+      },
+      "scores": {
+        "1": 0,
+        "2": 0
+      },
+      "width": 10,
+      "height": 10,
+      "apples": [
+        [
+          5,
+          4
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          2,
+          4
+        ]
+      ],
+      "move_history": [
+        {
+          "1": {
+            "move": "LEFT",
+            "rationale": "<plan>Your snake is positioned at (6, 9) and there's an apple at (5, 4). Moving left will bring you closer to the apple.</plan>\n<action>LEFT</action>"
+          },
+          "2": {
+            "move": "RIGHT",
+            "rationale": "<plan>Your snake is positioned at (9, 1) and there is an apple at (2, 4). To catch the apple, you need to move your snake to the RIGHT side of it.</plan>\n<action>RIGHT</action>"
+          }
+        }
+      ]
+    }
+  ]
+}

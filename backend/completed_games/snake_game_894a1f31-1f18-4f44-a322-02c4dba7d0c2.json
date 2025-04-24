@@ -1,0 +1,391 @@
+{
+  "metadata": {
+    "game_id": "894a1f31-1f18-4f44-a322-02c4dba7d0c2",
+    "start_time": "2025-04-02T13:27:12.667165",
+    "end_time": "2025-04-02T13:28:03.798858",
+    "models": {
+      "1": "step_1250",
+      "2": "RandomPlayer"
+    },
+    "game_result": {
+      "1": "won",
+      "2": "lost"
+    },
+    "final_scores": {
+      "1": 0,
+      "2": 1
+    },
+    "death_info": {
+      "2": {
+        "reason": "body_collision",
+        "round": 3
+      }
+    },
+    "max_rounds": 50,
+    "actual_rounds": 3
+  },
+  "rounds": [
+    {
+      "round_number": 0,
+      "snake_positions": {
+        "1": [
+          [
+            4,
+            7
+          ]
+        ],
+        "2": [
+          [
+            6,
+            8
+          ]
+        ]
+      },
+      "alive": {
+        "1": true,
+        "2": true
+      },
+      "scores": {
+        "1": 0,
+        "2": 0
+      },
+      "width": 10,
+      "height": 10,
+      "apples": [
+        [
+          1,
+          0
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          3,
+          5
+        ]
+      ],
+      "move_history": []
+    },
+    {
+      "round_number": 1,
+      "snake_positions": {
+        "1": [
+          [
+            3,
+            7
+          ]
+        ],
+        "2": [
+          [
+            5,
+            8
+          ]
+        ]
+      },
+      "alive": {
+        "1": true,
+        "2": true
+      },
+      "scores": {
+        "1": 0,
+        "2": 0
+      },
+      "width": 10,
+      "height": 10,
+      "apples": [
+        [
+          1,
+          0
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          3,
+          5
+        ]
+      ],
+      "move_history": [
+        {
+          "2": {
+            "move": "LEFT",
+            "rationale": "Random choice"
+          },
+          "1": {
+            "move": "LEFT",
+            "rationale": "<plan>Your current position is at (4, 7). The closest apple is at (1, 0). You should move one step to the LEFT to get to the apple.</plan>\n<action>LEFT</action>"
+          }
+        }
+      ]
+    },
+    {
+      "round_number": 2,
+      "snake_positions": {
+        "1": [
+          [
+            2,
+            7
+          ]
+        ],
+        "2": [
+          [
+            5,
+            9
+          ]
+        ]
+      },
+      "alive": {
+        "1": true,
+        "2": true
+      },
+      "scores": {
+        "1": 0,
+        "2": 0
+      },
+      "width": 10,
+      "height": 10,
+      "apples": [
+        [
+          1,
+          0
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          3,
+          5
+        ]
+      ],
+      "move_history": [
+        {
+          "2": {
+            "move": "LEFT",
+            "rationale": "Random choice"
+          },
+          "1": {
+            "move": "LEFT",
+            "rationale": "<plan>Your current position is at (4, 7). The closest apple is at (1, 0). You should move one step to the LEFT to get to the apple.</plan>\n<action>LEFT</action>"
+          }
+        },
+        {
+          "2": {
+            "move": "UP",
+            "rationale": "Random choice"
+          },
+          "1": {
+            "move": "LEFT",
+            "rationale": "<plan>Your current position is at (3, 7). There is an apple at (1, 0). Moving left will bring you closer to the apple.</plan>\n<action>LEFT</action> The snake at ID 1 moves to (2, 7) to get close to the apple at"
+          }
+        }
+      ]
+    },
+    {
+      "round_number": 3,
+      "snake_positions": {
+        "1": [
+          [
+            1,
+            7
+          ]
+        ],
+        "2": [
+          [
+            4,
+            9
+          ],
+          [
+            5,
+            9
+          ]
+        ]
+      },
+      "alive": {
+        "1": true,
+        "2": true
+      },
+      "scores": {
+        "1": 0,
+        "2": 1
+      },
+      "width": 10,
+      "height": 10,
+      "apples": [
+        [
+          1,
+          0
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          5,
+          1
+        ]
+      ],
+      "move_history": [
+        {
+          "2": {
+            "move": "LEFT",
+            "rationale": "Random choice"
+          },
+          "1": {
+            "move": "LEFT",
+            "rationale": "<plan>Your current position is at (4, 7). The closest apple is at (1, 0). You should move one step to the LEFT to get to the apple.</plan>\n<action>LEFT</action>"
+          }
+        },
+        {
+          "2": {
+            "move": "UP",
+            "rationale": "Random choice"
+          },
+          "1": {
+            "move": "LEFT",
+            "rationale": "<plan>Your current position is at (3, 7). There is an apple at (1, 0). Moving left will bring you closer to the apple.</plan>\n<action>LEFT</action> The snake at ID 1 moves to (2, 7) to get close to the apple at"
+          }
+        },
+        {
+          "2": {
+            "move": "LEFT",
+            "rationale": "Random choice"
+          },
+          "1": {
+            "move": "LEFT",
+            "rationale": "<plan>Your current position is at (2, 7). The closest apple to your current position is at (1, 0). Moving left will bring you closer to the apple.</plan>\n<action>LEFT</action>"
+          }
+        }
+      ]
+    },
+    {
+      "round_number": 3,
+      "snake_positions": {
+        "1": [
+          [
+            1,
+            7
+          ]
+        ],
+        "2": [
+          [
+            4,
+            9
+          ],
+          [
+            5,
+            9
+          ]
+        ]
+      },
+      "alive": {
+        "1": true,
+        "2": false
+      },
+      "scores": {
+        "1": 0,
+        "2": 1
+      },
+      "width": 10,
+      "height": 10,
+      "apples": [
+        [
+          1,
+          0
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          5,
+          1
+        ]
+      ],
+      "move_history": [
+        {
+          "2": {
+            "move": "LEFT",
+            "rationale": "Random choice"
+          },
+          "1": {
+            "move": "LEFT",
+            "rationale": "<plan>Your current position is at (4, 7). The closest apple is at (1, 0). You should move one step to the LEFT to get to the apple.</plan>\n<action>LEFT</action>"
+          }
+        },
+        {
+          "2": {
+            "move": "UP",
+            "rationale": "Random choice"
+          },
+          "1": {
+            "move": "LEFT",
+            "rationale": "<plan>Your current position is at (3, 7). There is an apple at (1, 0). Moving left will bring you closer to the apple.</plan>\n<action>LEFT</action> The snake at ID 1 moves to (2, 7) to get close to the apple at"
+          }
+        },
+        {
+          "2": {
+            "move": "LEFT",
+            "rationale": "Random choice"
+          },
+          "1": {
+            "move": "LEFT",
+            "rationale": "<plan>Your current position is at (2, 7). The closest apple to your current position is at (1, 0). Moving left will bring you closer to the apple.</plan>\n<action>LEFT</action>"
+          }
+        },
+        {
+          "2": {
+            "move": "RIGHT",
+            "rationale": "Random choice"
+          },
+          "1": {
+            "move": "LEFT",
+            "rationale": "<plan>Your current position is at (1, 7). There is an apple at (1, 0). Move left to eat the apple and grow.</plan>\n<action>LEFT</action>"
+          }
+        }
+      ]
+    }
+  ]
+}
