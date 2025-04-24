@@ -147,12 +147,12 @@ class FastSnakeEnv(gym.Env):
                 for action, (new_x, new_y) in possible_actions.items():
                     # Check wall collisions
                     if not (0 <= new_x < self.width and 0 <= new_y < self.height):
-                        print(f"RandomPlayer would hit a wall at {new_x}, {new_y}")
+                        # print(f"RandomPlayer would hit a wall at {new_x}, {new_y}")
                         continue
 
                     # Check self collisions (excluding tail)
                     if (new_x, new_y) in body_to_check:
-                        print(f"RandomPlayer would hit itself at {new_x}, {new_y}")
+                        # print(f"RandomPlayer would hit itself at {new_x}, {new_y}")
                         continue
 
                     # Check collisions with other snakes (Optional - RandomPlayer doesn't do this)
