@@ -137,7 +137,7 @@ class FastSnake:
             
         rewards = {sid: 0.0 for sid in self.snakes}
         
-        # Calculate new heads
+        # ---- PHASE 1: Calculate all new head positions ----
         new_heads = {}
         for snake_id, action in actions.items():
             if not self.snakes[snake_id]['alive']:
@@ -146,11 +146,29 @@ class FastSnake:
             head = np.array(self.snakes[snake_id]['positions'][0])
             new_heads[snake_id] = tuple(head + self.MOVE_DELTAS[action])
         
-        # Check collisions and update snakes
+        # ---- PHASE 2: Check for head-to-head collisions ----
+        # Find duplicate head positions (head-to-head collisions)
+        head_counts = {}
+        for snake_id, new_head in new_heads.items():
+            if new_head in head_counts:
+                head_counts[new_head].append(snake_id)
+            else:
+                head_counts[new_head] = [snake_id]
+        
+        # Mark snakes involved in head-to-head collisions as not alive
+        for pos, snake_ids in head_counts.items():
+            if len(snake_ids) > 1:
+                # More than one snake moving to the same position - collision!
+                for snake_id in snake_ids:
+                    if self.snakes[snake_id]['alive']:
+                        self.snakes[snake_id]['alive'] = False
+                        rewards[snake_id] -= 1.0
+                        
+        # ---- PHASE 3: Process individual snake moves and collisions ----
         for snake_id, new_head in new_heads.items():
             snake = self.snakes[snake_id]
             if not snake['alive']:
-                continue
+                continue  # Skip already dead snakes (from head-to-head collisions)
                 
             x, y = new_head
             
@@ -160,7 +178,8 @@ class FastSnake:
                 rewards[snake_id] -= 1.0
                 continue
             
-            # Check collisions with snakes
+            # Check collisions with snake bodies on the current board
+            # (This won't catch head-to-head collisions, which we handled above)
             if self.board[y, x] in [self.SNAKE_BODY, self.SNAKE_HEAD]:
                 snake['alive'] = False
                 rewards[snake_id] -= 1.0
@@ -178,6 +197,7 @@ class FastSnake:
             else:
                 snake['positions'].pop()
         
+        # Update the board after all snakes have moved
         self._update_board()
         self.round_number += 1
         
