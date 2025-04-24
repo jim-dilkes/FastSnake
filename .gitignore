@@ -3,3 +3,4 @@
 .DS_Store?
 ._*
 __pycache__
+.local_models/
