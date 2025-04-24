@@ -13,7 +13,8 @@ RIGHT = 3
 class FastSnake:
     """Optimized snake game implementation using NumPy arrays."""
     
-    def __init__(self, width: int, height: int, num_apples: int = 1, max_rounds: int = 100):
+    def __init__(self, width: int, height: int, num_apples: int = 1, max_rounds: int = 100, 
+                 apple_rng=None):
         # Board representation constants
         self.EMPTY = 100
         self.SNAKE_BODY = 101
@@ -24,6 +25,9 @@ class FastSnake:
         self.height = height
         self.num_apples = num_apples
         self.max_rounds = max_rounds
+        
+        # Use provided RNGs or create new ones
+        self.apple_rng = apple_rng if apple_rng is not None else np.random.RandomState()
         
         # Pre-compute movement deltas for efficiency
         self.MOVE_DELTAS = {
@@ -72,7 +76,12 @@ class FastSnake:
         empty_cells = np.argwhere(self.board == self.EMPTY)
         if len(empty_cells) == 0:
             raise RuntimeError("No empty cells available")
-        idx = np.random.randint(len(empty_cells))
+        
+        # Sort empty cells for deterministic selection with same seed
+        # This ensures consistent results even if board state changes
+        empty_cells = sorted(empty_cells, key=lambda cell: (cell[0], cell[1]))
+        
+        idx = self.apple_rng.randint(len(empty_cells))
         return tuple(empty_cells[idx])
     
     def _place_apple(self) -> None:

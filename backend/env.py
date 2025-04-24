@@ -82,12 +82,23 @@ class FastSnakeEnv(gym.Env):
         """Reset the environment."""
         super().reset(seed=seed)
         
-        # Create new game instance
+        # Create separate RNGs for different purposes
+        if seed is not None:
+            # Create a separate RNG for snake actions - with a derived seed
+            self.snake_rng = np.random.RandomState(seed + 1)
+            # Create a separate RNG for apple placement - with a different derived seed
+            apple_rng = np.random.RandomState(seed + 2)
+        else:
+            self.snake_rng = None
+            apple_rng = None
+        
+        # Create new game instance with the separate RNGs
         self.game = FastSnake(
             width=self.width,
             height=self.height,
             num_apples=self.num_apples,
-            max_rounds=self.max_rounds
+            max_rounds=self.max_rounds,
+            apple_rng=apple_rng,  # RNG for apple placement
         )
         
         # Reset snake tracking
@@ -169,11 +180,23 @@ class FastSnakeEnv(gym.Env):
 
                 # Choose action
                 if valid_actions:
-                    chosen_action = random.choice(valid_actions)
+                    # Sort valid_actions for deterministic selection with same seed
+                    valid_actions.sort()
+                    # Use snake_rng if available, otherwise use _np_random
+                    if self.snake_rng is not None:
+                        chosen_action = self.snake_rng.choice(valid_actions)
+                    else:
+                        chosen_action = self._np_random.choice(valid_actions)
                 else:
                     # Trapped, choose a random action (likely dying)
                     print(f"RandomPlayer {snake_id} is trapped, choosing a random action")
-                    chosen_action = random.choice(list(possible_actions.keys()))
+                    possible_action_keys = list(possible_actions.keys())
+                    possible_action_keys.sort()  # Sort for deterministic selection
+                    # Use snake_rng if available, otherwise use _np_random
+                    if self.snake_rng is not None:
+                        chosen_action = self.snake_rng.choice(possible_action_keys)
+                    else:
+                        chosen_action = self._np_random.choice(possible_action_keys)
 
                 actions[snake_id] = chosen_action
 
