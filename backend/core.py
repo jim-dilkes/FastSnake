@@ -303,6 +303,9 @@ class FastSnake:
             
         rewards = {sid: 0.0 for sid in self.snakes}
         
+        # Track how many apples need to be respawned after all movements
+        apples_to_respawn = 0
+        
         # ---- PHASE 1: Calculate all new head positions ----
         new_heads = {}
         for snake_id, action in actions.items():
@@ -359,7 +362,7 @@ class FastSnake:
                 self.scores[snake_id] += self.apple_reward
                 rewards[snake_id] += float(self.apple_reward)
                 self.apples.remove(new_head)
-                self._place_apple()
+                apples_to_respawn += 1  # Track that we need to spawn an apple later
             # Check banana
             elif new_head in self.bananas:
                 self.scores[snake_id] += self.banana_reward
@@ -380,12 +383,30 @@ class FastSnake:
         
         # ---- PHASE 4: Roll apples down the hill (if hill_direction is set) ----
         if self.hill_direction is not None:
-            eaten_by_snake = self._roll_apples()
-            # Update rewards for snakes that ate apples during rolling
-            for _, snake_id in eaten_by_snake.items():
-                rewards[snake_id] += float(self.apple_reward)
+            # Store the scores before rolling to calculate rewards
+            pre_roll_scores = {sid: score for sid, score in self.scores.items()}
+            
+            # Roll apples and count how many need to be respawned
+            additional_apples_to_respawn = self._roll_apples()
+            apples_to_respawn += additional_apples_to_respawn
+            
+            # Update rewards based on score changes during rolling
+            for snake_id in self.snakes:
+                if snake_id in pre_roll_scores:
+                    # If score increased during rolling, add that to rewards
+                    score_change = self.scores[snake_id] - pre_roll_scores[snake_id]
+                    if score_change > 0:
+                        rewards[snake_id] += float(score_change)
+            
             # Update the board after apples have moved
             self._update_board()
+        
+        # ---- PHASE 5: Respawn all apples that were eaten ----
+        for _ in range(apples_to_respawn):
+            self._place_apple()
+            
+        # Final board update after all changes
+        self._update_board()
         
         self.round_number += 1
         
@@ -400,91 +421,129 @@ class FastSnake:
             {'scores': self.scores.copy(), 'round': self.round_number}
         )
     
-    def _roll_apples(self) -> None:
-        """Roll apples down the hill based on hill_direction."""
+    def _roll_apples(self) -> int:
+        """
+        Roll apples down the hill based on hill_direction.
+        Uses multiple passes to ensure proper cascading of apple movements.
+        Each apple can only move once per step.
+        
+        Returns:
+            int: Number of apples eaten during rolling that need to be respawned.
+        """
         if self.hill_direction is None:
-            return
+            return 0
             
         # Get movement delta for the hill direction
         delta = self.MOVE_DELTAS[self.DIR_TO_ACTION[self.hill_direction]]
         
-        # Process apples in the direction of movement to avoid multiple movements in one step
-        # For example, if moving right, process from right to left
-        apples_to_process = self.apples.copy()
+        # Track apples eaten during rolling
+        apples_eaten_count = 0
         
-        if self.hill_direction == "right":
-            # Process from right to left (highest x to lowest)
-            apples_to_process.sort(key=lambda pos: (-pos[0], pos[1]))
-        elif self.hill_direction == "left":
-            # Process from left to right (lowest x to highest)
-            apples_to_process.sort(key=lambda pos: (pos[0], pos[1]))
-        elif self.hill_direction == "up":
-            # Process from top to bottom (highest y to lowest)
-            apples_to_process.sort(key=lambda pos: (-pos[1], pos[0]))
-        elif self.hill_direction == "down":
-            # Process from bottom to top (lowest y to highest)
-            apples_to_process.sort(key=lambda pos: (pos[1], pos[0]))
+        # Track which original positions have already moved
+        # This ensures each apple only moves once per step
+        original_positions = {pos: pos for pos in self.apples}
+        moved_positions = set()
+        
+        # Continue rolling until no more movements occur
+        movement_occurred = True
+        
+        while movement_occurred:
+            movement_occurred = False
             
-        # Keep track of new positions to handle collisions properly
-        new_apple_positions = []
-        snake_heads = {}
-        
-        # Get all snake head positions for eating checks
-        for snake_id, snake in self.snakes.items():
-            if snake['alive'] and snake['positions']:
-                snake_heads[tuple(snake['positions'][0])] = snake_id
-                
-        # Track apples to remove (eaten during rolling)
-        apples_to_remove = []
-        eaten_by_snake = {}  # Track which snake ate which apple
-        
-        for i, apple_pos in enumerate(apples_to_process):
-            apple_x, apple_y = apple_pos
-            new_x = apple_x + int(delta[0])
-            new_y = apple_y + int(delta[1])
-            new_pos = (new_x, new_y)
+            # Process apples in the direction of movement
+            apples_to_process = list(self.apples)
             
-            # Check if the apple would roll off the board
-            if not (0 <= new_x < self.width and 0 <= new_y < self.height):
-                new_apple_positions.append(apple_pos)  # Stay in place
-                continue
+            if self.hill_direction == "right":
+                # Process from right to left (highest x to lowest)
+                apples_to_process.sort(key=lambda pos: (-pos[0], pos[1]))
+            elif self.hill_direction == "left":
+                # Process from left to right (lowest x to highest)
+                apples_to_process.sort(key=lambda pos: (pos[0], pos[1]))
+            elif self.hill_direction == "up":
+                # Process from top to bottom (highest y to lowest)
+                apples_to_process.sort(key=lambda pos: (-pos[1], pos[0]))
+            elif self.hill_direction == "down":
+                # Process from bottom to top (lowest y to highest)
+                apples_to_process.sort(key=lambda pos: (pos[1], pos[0]))
                 
-            # Check if the apple would roll into a snake's head
-            if new_pos in snake_heads:
-                # Snake eats the apple
-                snake_id = snake_heads[new_pos]
-                self.scores[snake_id] += self.apple_reward
-                # Track this apple for removal and which snake ate it
-                apples_to_remove.append(apple_pos)
-                eaten_by_snake[apple_pos] = snake_id
-                # Place a new apple
-                self._place_apple()
-                continue
-                
-            # Check if the apple would roll into a snake body, another apple, or a banana
-            board_val = self.board[new_y, new_x]
-            if board_val in [self.SNAKE_BODY, self.APPLE, self.BANANA]:
-                new_apple_positions.append(apple_pos)  # Stay in place
-                continue
-                
-            # Check if the apple would roll into a position where another apple just moved
-            if new_pos in new_apple_positions:
-                new_apple_positions.append(apple_pos)  # Stay in place
-                continue
-                
-            # Apple can move to the new position
-            new_apple_positions.append(new_pos)
+            # Keep track of new positions
+            new_apple_positions = []
+            snake_heads = {}
             
-        # Remove eaten apples
-        for pos in apples_to_remove:
-            if pos in self.apples:
-                self.apples.remove(pos)
+            # Get all snake head positions for eating checks
+            for snake_id, snake in self.snakes.items():
+                if snake['alive'] and snake['positions']:
+                    snake_heads[tuple(snake['positions'][0])] = snake_id
+                    
+            # Track apples to remove (eaten during rolling)
+            apples_to_remove = []
+            
+            for apple_pos in apples_to_process:
+                # Get the original position this apple started from
+                original_pos = original_positions.get(apple_pos, apple_pos)
                 
-        # Update all apple positions
-        self.apples = [pos for pos in new_apple_positions if pos not in apples_to_remove]
+                # Skip if this original position has already moved in this step
+                if original_pos in moved_positions:
+                    new_apple_positions.append(apple_pos)
+                    continue
+                    
+                apple_x, apple_y = apple_pos
+                new_x = apple_x + int(delta[0])
+                new_y = apple_y + int(delta[1])
+                new_pos = (new_x, new_y)
+                
+                # Check if the apple would roll off the board
+                if not (0 <= new_x < self.width and 0 <= new_y < self.height):
+                    new_apple_positions.append(apple_pos)  # Stay in place
+                    continue
+                    
+                # Check if the apple would roll into a snake's head
+                if new_pos in snake_heads:
+                    # Snake eats the apple
+                    snake_id = snake_heads[new_pos]
+                    self.scores[snake_id] += self.apple_reward
+                    # Track this apple for removal
+                    apples_to_remove.append(apple_pos)
+                    apples_eaten_count += 1
+                    movement_occurred = True  # Count as movement for cascade checks
+                    # Mark original position as moved
+                    moved_positions.add(original_pos)
+                    continue
+                    
+                # Check collisions using current board state
+                board_val = self.board[new_y, new_x]
+                collision_objects = [self.SNAKE_BODY, self.APPLE, self.BANANA]
+                
+                # Check if the apple would roll into a position where another apple is being processed
+                collision_with_new_pos = new_pos in new_apple_positions
+                
+                if board_val in collision_objects or collision_with_new_pos:
+                    new_apple_positions.append(apple_pos)  # Stay in place
+                    continue
+                    
+                # Apple can move to the new position
+                new_apple_positions.append(new_pos)
+                # Update mapping from new position to original position
+                original_positions[new_pos] = original_pos
+                # Mark that this original position has moved
+                moved_positions.add(original_pos)
+                movement_occurred = True  # Movement occurred, do another pass
+            
+            # Remove eaten apples
+            for pos in apples_to_remove:
+                if pos in self.apples:
+                    self.apples.remove(pos)
+                    if pos in original_positions:
+                        del original_positions[pos]
+                    
+            # Update all apple positions
+            self.apples = [pos for pos in new_apple_positions if pos not in apples_to_remove]
+            
+            # Update the board to reflect the new apple positions
+            self._update_board()
         
-        # Return dictionary of snakes that ate apples during rolling for reward calculation
-        return eaten_by_snake
+        # Return number of apples eaten during rolling
+        return apples_eaten_count
     
     def get_observations(self) -> Dict[str, np.ndarray]:
         """Get observations for all snakes."""
