@@ -25,7 +25,8 @@ class FastSnake:
                  banana_rng=None, 
                  num_fires: int = 2, 
                  fire_reward: int = -1, 
-                 fire_rng=None, 
+                 fire_rng=None,
+                 hill_direction: str = None,
                  ):
         # Board representation constants
         self.EMPTY = 100
@@ -44,6 +45,16 @@ class FastSnake:
         self.banana_reward = banana_reward if banana_reward is not None else 0
         self.num_fires = num_fires if num_fires is not None else 0
         self.fire_reward = fire_reward if fire_reward is not None else 0
+        self.hill_direction = hill_direction
+        
+        # Validate hill_direction
+        if hill_direction is not None:
+            if hill_direction not in ["up", "down", "left", "right"]:
+                raise ValueError(f"Invalid hill_direction: {hill_direction}. Must be one of 'up', 'down', 'left', 'right', or None")
+            
+            # Rolling apples not compatible with fires
+            if num_fires is not None and num_fires > 0:
+                raise ValueError("Rolling apples (hill_direction) is not compatible with fires. Please set num_fires to 0 or hill_direction to None.")
         
         # Use provided RNGs or create new ones
         self.apple_rng = apple_rng if apple_rng is not None else np.random.RandomState()
@@ -56,6 +67,14 @@ class FastSnake:
             DOWN: np.array([0, -1]),
             LEFT: np.array([-1, 0]),
             RIGHT: np.array([1, 0])
+        }
+        
+        # Map string direction to action constant
+        self.DIR_TO_ACTION = {
+            "up": UP,
+            "down": DOWN,
+            "left": LEFT,
+            "right": RIGHT
         }
         
         # Initialize game state
@@ -134,14 +153,84 @@ class FastSnake:
         return tuple(empty_cells[idx])
     
     def _place_apple(self) -> None:
-        """Place a new apple on an empty cell."""
+        """Place a new apple on an empty cell, respecting hill direction if set."""
+        # Initial game setup - apples can spawn anywhere
+        if self.round_number == 0 or self.hill_direction is None:
+            try:
+                pos = self._random_free_cell()
+                self.apples.append(pos)
+                y, x = pos
+                self.board[y, x] = self.APPLE
+            except RuntimeError:
+                pass  # No empty cells for apple
+            return
+            
+        # After game start with hill direction, apples spawn at the "upper" edge
         try:
-            pos = self._random_free_cell()
-            self.apples.append(pos)
-            y, x = pos
-            self.board[y, x] = self.APPLE
+            pos = self._get_apple_spawn_position()
+            if pos:
+                self.apples.append(pos)
+                y, x = pos
+                self.board[y, x] = self.APPLE
         except RuntimeError:
-            pass  # No empty cells for apple
+            pass  # No valid positions available
+    
+    def _get_apple_spawn_position(self) -> Optional[Tuple[int, int]]:
+        """Get a valid spawn position for an apple based on hill direction."""
+        if self.hill_direction is None:
+            return self._random_free_cell()
+            
+        # Define the edge to start checking based on hill direction
+        if self.hill_direction == "right":
+            # Start from left edge (x=0) and move right if no spaces
+            for x in range(self.width):
+                empty_positions = []
+                for y in range(self.height):
+                    if self.board[y, x] == self.EMPTY:
+                        empty_positions.append((x, y))
+                # If found empty positions in this column, choose a random one
+                if empty_positions:
+                    idx = self.apple_rng.randint(len(empty_positions))
+                    return empty_positions[idx]
+                        
+        elif self.hill_direction == "left":
+            # Start from right edge (x=width-1) and move left if no spaces
+            for x in range(self.width - 1, -1, -1):
+                empty_positions = []
+                for y in range(self.height):
+                    if self.board[y, x] == self.EMPTY:
+                        empty_positions.append((x, y))
+                # If found empty positions in this column, choose a random one
+                if empty_positions:
+                    idx = self.apple_rng.randint(len(empty_positions))
+                    return empty_positions[idx]
+                        
+        elif self.hill_direction == "up":
+            # Start from bottom edge (y=0) and move up if no spaces
+            for y in range(self.height):
+                empty_positions = []
+                for x in range(self.width):
+                    if self.board[y, x] == self.EMPTY:
+                        empty_positions.append((x, y))
+                # If found empty positions in this row, choose a random one
+                if empty_positions:
+                    idx = self.apple_rng.randint(len(empty_positions))
+                    return empty_positions[idx]
+                        
+        elif self.hill_direction == "down":
+            # Start from top edge (y=height-1) and move down if no spaces
+            for y in range(self.height - 1, -1, -1):
+                empty_positions = []
+                for x in range(self.width):
+                    if self.board[y, x] == self.EMPTY:
+                        empty_positions.append((x, y))
+                # If found empty positions in this row, choose a random one
+                if empty_positions:
+                    idx = self.apple_rng.randint(len(empty_positions))
+                    return empty_positions[idx]
+        
+        # If we've checked all edges and found no space, use any random empty cell
+        return self._random_free_cell()
     
     def _place_banana(self) -> None:
         """Place a new banana on an empty cell."""
@@ -288,6 +377,16 @@ class FastSnake:
         
         # Update the board after all snakes have moved
         self._update_board()
+        
+        # ---- PHASE 4: Roll apples down the hill (if hill_direction is set) ----
+        if self.hill_direction is not None:
+            eaten_by_snake = self._roll_apples()
+            # Update rewards for snakes that ate apples during rolling
+            for _, snake_id in eaten_by_snake.items():
+                rewards[snake_id] += float(self.apple_reward)
+            # Update the board after apples have moved
+            self._update_board()
+        
         self.round_number += 1
         
         # Check game over conditions
@@ -300,6 +399,92 @@ class FastSnake:
             self.game_over,
             {'scores': self.scores.copy(), 'round': self.round_number}
         )
+    
+    def _roll_apples(self) -> None:
+        """Roll apples down the hill based on hill_direction."""
+        if self.hill_direction is None:
+            return
+            
+        # Get movement delta for the hill direction
+        delta = self.MOVE_DELTAS[self.DIR_TO_ACTION[self.hill_direction]]
+        
+        # Process apples in the direction of movement to avoid multiple movements in one step
+        # For example, if moving right, process from right to left
+        apples_to_process = self.apples.copy()
+        
+        if self.hill_direction == "right":
+            # Process from right to left (highest x to lowest)
+            apples_to_process.sort(key=lambda pos: (-pos[0], pos[1]))
+        elif self.hill_direction == "left":
+            # Process from left to right (lowest x to highest)
+            apples_to_process.sort(key=lambda pos: (pos[0], pos[1]))
+        elif self.hill_direction == "up":
+            # Process from top to bottom (highest y to lowest)
+            apples_to_process.sort(key=lambda pos: (-pos[1], pos[0]))
+        elif self.hill_direction == "down":
+            # Process from bottom to top (lowest y to highest)
+            apples_to_process.sort(key=lambda pos: (pos[1], pos[0]))
+            
+        # Keep track of new positions to handle collisions properly
+        new_apple_positions = []
+        snake_heads = {}
+        
+        # Get all snake head positions for eating checks
+        for snake_id, snake in self.snakes.items():
+            if snake['alive'] and snake['positions']:
+                snake_heads[tuple(snake['positions'][0])] = snake_id
+                
+        # Track apples to remove (eaten during rolling)
+        apples_to_remove = []
+        eaten_by_snake = {}  # Track which snake ate which apple
+        
+        for i, apple_pos in enumerate(apples_to_process):
+            apple_x, apple_y = apple_pos
+            new_x = apple_x + int(delta[0])
+            new_y = apple_y + int(delta[1])
+            new_pos = (new_x, new_y)
+            
+            # Check if the apple would roll off the board
+            if not (0 <= new_x < self.width and 0 <= new_y < self.height):
+                new_apple_positions.append(apple_pos)  # Stay in place
+                continue
+                
+            # Check if the apple would roll into a snake's head
+            if new_pos in snake_heads:
+                # Snake eats the apple
+                snake_id = snake_heads[new_pos]
+                self.scores[snake_id] += self.apple_reward
+                # Track this apple for removal and which snake ate it
+                apples_to_remove.append(apple_pos)
+                eaten_by_snake[apple_pos] = snake_id
+                # Place a new apple
+                self._place_apple()
+                continue
+                
+            # Check if the apple would roll into a snake body, another apple, or a banana
+            board_val = self.board[new_y, new_x]
+            if board_val in [self.SNAKE_BODY, self.APPLE, self.BANANA]:
+                new_apple_positions.append(apple_pos)  # Stay in place
+                continue
+                
+            # Check if the apple would roll into a position where another apple just moved
+            if new_pos in new_apple_positions:
+                new_apple_positions.append(apple_pos)  # Stay in place
+                continue
+                
+            # Apple can move to the new position
+            new_apple_positions.append(new_pos)
+            
+        # Remove eaten apples
+        for pos in apples_to_remove:
+            if pos in self.apples:
+                self.apples.remove(pos)
+                
+        # Update all apple positions
+        self.apples = [pos for pos in new_apple_positions if pos not in apples_to_remove]
+        
+        # Return dictionary of snakes that ate apples during rolling for reward calculation
+        return eaten_by_snake
     
     def get_observations(self) -> Dict[str, np.ndarray]:
         """Get observations for all snakes."""

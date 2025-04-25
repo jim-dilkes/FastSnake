@@ -30,7 +30,8 @@ class FastSnakeEnv(gym.Env):
                  num_bananas: int = None,
                  banana_reward: int = None,
                  num_fires: int = None, 
-                 fire_reward: int = None,):
+                 fire_reward: int = None,
+                 hill_direction: str = None):
         """
         Initialize Fast Snake Game Environment.
         
@@ -44,8 +45,9 @@ class FastSnakeEnv(gym.Env):
             num_bananas: Number of bananas on the board (worth more points)
             banana_reward: Points awarded for eating a banana
             num_fires: Number of fires on the board (worth negative points)
-            fire_penalty: Points deducted for walking on fire
+            fire_reward: Points deducted for walking on fire
             apple_reward: Points awarded for eating an apple
+            hill_direction: Direction of the hill the apples will roll down(up, down, left, right)
         """
         super().__init__()
         
@@ -62,6 +64,11 @@ class FastSnakeEnv(gym.Env):
         self.banana_reward = banana_reward
         self.num_fires = num_fires
         self.fire_reward = fire_reward
+        self.hill_direction = hill_direction
+        
+        # Validate hill_direction with fires
+        if hill_direction is not None and num_fires is not None and num_fires > 0:
+            raise ValueError("hill_direction is not compatible with fires. Please set num_fires to 0 or hill_direction to None.")
         
         # Define action spaces
         if num_external_snakes == 1:
@@ -132,6 +139,7 @@ class FastSnakeEnv(gym.Env):
             num_fires=self.num_fires,
             fire_reward=self.fire_reward,
             fire_rng=fire_rng,
+            hill_direction=self.hill_direction,  # Pass the hill direction to core
         )
         
         # Reset snake tracking
@@ -348,13 +356,17 @@ class FastSnakeEnv(gym.Env):
 
         # Get board representation using the updated render_text
         board_str = self.game.render_text()
+        
+        # Include hill direction information if applicable
+        hill_direction_str = f"Apples roll {self.hill_direction}" if self.hill_direction else "Apples don't roll"
 
         # Construct the final string
         return (
             f"The board size is {self.width}x{self.height}. Normal (X, Y) coordinates are used. Coordinates range from (0, 0) at bottom left to ({self.width-1}, {self.height-1}) at top right.\n"
             f"Apples at: {apples_str} (worth {self.apple_reward} points each)\n"
             f"Bananas at: {bananas_str} (worth {self.banana_reward} points each)\n"
-            f"Fires at: {fires_str} (worth {self.fire_reward} points each)\n\n"
+            f"Fires at: {fires_str} (worth {self.fire_reward} points each)\n"
+            f"{hill_direction_str}\n\n"
             f"Your snake ID: {your_snake_number} which is currently positioned at {your_snake_head_str} with body at {your_snake_body_str}\n\n"
             f"Enemy snakes positions:\n{enemy_str}\n\n"
             f"Game state:\n"

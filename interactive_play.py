@@ -11,14 +11,15 @@ from backend.core import UP, DOWN, LEFT, RIGHT # Import constants
 # --- Default Game Parameters ---
 DEFAULT_WIDTH = 10
 DEFAULT_HEIGHT = 10
-DEFAULT_NUM_APPLES = 3
+DEFAULT_NUM_APPLES = 5
 DEFAULT_MAX_ROUNDS = 200
 DEFAULT_NUM_RANDOM_SNAKES = 1
-DEFAULT_NUM_BANANAS = 1
-DEFAULT_BANANA_REWARD = 5
-DEFAULT_NUM_FIRES = 2
-DEFAULT_FIRE_REWARD = -1
+DEFAULT_NUM_BANANAS = 0
+DEFAULT_BANANA_REWARD = 0
+DEFAULT_NUM_FIRES = 0
+DEFAULT_FIRE_REWARD = 0
 DEFAULT_APPLE_REWARD = 1
+DEFAULT_HILL_DIRECTION = None
 # ------------------------------
 
 # --- Action Mapping ---
@@ -45,6 +46,8 @@ def parse_args():
     parser.add_argument('--banana-reward', type=int, default=DEFAULT_BANANA_REWARD, help=f'Points for eating a banana (default: {DEFAULT_BANANA_REWARD})')
     parser.add_argument('--fires', type=int, default=DEFAULT_NUM_FIRES, help=f'Number of fires (default: {DEFAULT_NUM_FIRES})')
     parser.add_argument('--fire-reward', type=int, default=DEFAULT_FIRE_REWARD, help=f'Points for hitting fire (default: {DEFAULT_FIRE_REWARD}, negative means penalty)')
+    parser.add_argument('--hill-direction', type=str, choices=['up', 'down', 'left', 'right', 'none'], default=None, 
+                        help='Direction for apples to roll (up, down, left, right, none)')
     return parser.parse_args()
 
 # Helper function to get single character input without needing Enter
@@ -59,6 +62,27 @@ def getch():
     return ch
 
 def play_game(args):
+    # Process hill direction argument
+    hill_direction = None if args.hill_direction == 'none' else args.hill_direction
+    
+    # Check compatibility of hill direction and fires
+    if hill_direction is not None and args.fires > 0:
+        print("Warning: Hill direction is not compatible with fires.")
+        print("Would you like to:")
+        print("1. Disable fires")
+        print("2. Disable hill direction")
+        print("3. Exit")
+        choice = input("Enter choice (1/2/3): ")
+        if choice == '1':
+            args.fires = 0
+            print("Fires disabled.")
+        elif choice == '2':
+            hill_direction = None
+            print("Hill direction disabled.")
+        else:
+            print("Exiting game.")
+            return
+    
     print("Initializing FastSnakeEnv for interactive play...")
     env = FastSnakeEnv(
         width=args.width,
@@ -71,7 +95,8 @@ def play_game(args):
         banana_reward=args.banana_reward,
         num_fires=args.fires,
         fire_reward=args.fire_reward,
-        apple_reward=args.apple_reward
+        apple_reward=args.apple_reward,
+        hill_direction=hill_direction
     )
 
     print("Game settings:")
@@ -80,6 +105,7 @@ def play_game(args):
     print(f"  Bananas: {args.bananas} ({args.banana_reward} points each)")
     print(f"  Fires: {args.fires} ({args.fire_reward} points each)")
     print(f"  Random snakes: {args.random_snakes}")
+    print(f"  Hill direction: {hill_direction if hill_direction else 'None (apples stay in place)'}")
     print(f"  Max rounds: {args.rounds}")
 
     print("Resetting environment...")
