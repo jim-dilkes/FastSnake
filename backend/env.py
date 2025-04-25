@@ -20,10 +20,17 @@ class FastSnakeEnv(gym.Env):
     def __init__(self, 
                  width: int = 10, 
                  height: int = 10, 
-                 num_apples: int = 5, 
                  max_rounds: int = 100,
                  num_external_snakes: int = 1,
-                 num_random_snakes: int = 1):
+                 num_random_snakes: int = 1,
+                 death_reward: int = -2,
+                 step_reward: int = -0.01,
+                 num_apples: int = 5, 
+                 apple_reward: int = 1,
+                 num_bananas: int = None,
+                 banana_reward: int = None,
+                 num_fires: int = None, 
+                 fire_reward: int = None,):
         """
         Initialize Fast Snake Game Environment.
         
@@ -34,15 +41,27 @@ class FastSnakeEnv(gym.Env):
             max_rounds: Maximum number of rounds before game ends
             num_external_snakes: Number of snakes controlled by the environment
             num_random_snakes: Number of additional random-policy snakes
+            num_bananas: Number of bananas on the board (worth more points)
+            banana_reward: Points awarded for eating a banana
+            num_fires: Number of fires on the board (worth negative points)
+            fire_penalty: Points deducted for walking on fire
+            apple_reward: Points awarded for eating an apple
         """
         super().__init__()
         
         self.width = width
         self.height = height
-        self.num_apples = num_apples
         self.max_rounds = max_rounds
         self.num_external_snakes = num_external_snakes
         self.num_random_snakes = num_random_snakes
+        self.death_reward = death_reward
+        self.step_reward = step_reward
+        self.num_apples = num_apples
+        self.apple_reward = apple_reward
+        self.num_bananas = num_bananas
+        self.banana_reward = banana_reward
+        self.num_fires = num_fires
+        self.fire_reward = fire_reward
         
         # Define action spaces
         if num_external_snakes == 1:
@@ -50,11 +69,13 @@ class FastSnakeEnv(gym.Env):
         else:
             self.action_space = spaces.Tuple([spaces.Discrete(4)] * num_external_snakes)
         
-        # Define observation spaces - using 3 channels
+        # Define observation spaces with 5 channels instead of 3
         # Channel 0: Current snake (1=body, 2=head)
         # Channel 1: Apples (1=apple)
-        # Channel 2: Other snakes (1=body, 2=head)
-        obs_shape = (3, height, width)
+        # Channel 2: Bananas (1=banana)
+        # Channel 3: Fires (1=fire)
+        # Channel 4: Other snakes (1=body, 2=head)
+        obs_shape = (5, height, width)
         if num_external_snakes == 1:
             self.observation_space = spaces.Box(
                 low=0, high=2,
@@ -88,17 +109,29 @@ class FastSnakeEnv(gym.Env):
             self.snake_rng = np.random.RandomState(seed + 1)
             # Create a separate RNG for apple placement - with a different derived seed
             apple_rng = np.random.RandomState(seed + 2)
+            # Create RNGs for banana and fire placement
+            banana_rng = np.random.RandomState(seed + 3)
+            fire_rng = np.random.RandomState(seed + 4)
         else:
             self.snake_rng = None
             apple_rng = None
+            banana_rng = None
+            fire_rng = None
         
         # Create new game instance with the separate RNGs
         self.game = FastSnake(
             width=self.width,
             height=self.height,
-            num_apples=self.num_apples,
             max_rounds=self.max_rounds,
+            num_apples=self.num_apples,
+            apple_reward=self.apple_reward,
             apple_rng=apple_rng,  # RNG for apple placement
+            num_bananas=self.num_bananas,
+            banana_reward=self.banana_reward,
+            banana_rng=banana_rng,
+            num_fires=self.num_fires,
+            fire_reward=self.fire_reward,
+            fire_rng=fire_rng,
         )
         
         # Reset snake tracking
@@ -182,21 +215,21 @@ class FastSnakeEnv(gym.Env):
                 if valid_actions:
                     # Sort valid_actions for deterministic selection with same seed
                     valid_actions.sort()
-                    # Use snake_rng if available, otherwise use _np_random
+                    # Use snake_rng if available, otherwise use standard random
                     if self.snake_rng is not None:
                         chosen_action = self.snake_rng.choice(valid_actions)
                     else:
-                        chosen_action = self._np_random.choice(valid_actions)
+                        chosen_action = random.choice(valid_actions)
                 else:
                     # Trapped, choose a random action (likely dying)
                     print(f"RandomPlayer {snake_id} is trapped, choosing a random action")
                     possible_action_keys = list(possible_actions.keys())
                     possible_action_keys.sort()  # Sort for deterministic selection
-                    # Use snake_rng if available, otherwise use _np_random
+                    # Use snake_rng if available, otherwise use standard random
                     if self.snake_rng is not None:
                         chosen_action = self.snake_rng.choice(possible_action_keys)
                     else:
-                        chosen_action = self._np_random.choice(possible_action_keys)
+                        chosen_action = random.choice(possible_action_keys)
 
                 actions[snake_id] = chosen_action
 
@@ -204,7 +237,13 @@ class FastSnakeEnv(gym.Env):
         observations, rewards, done, info = self.game.step(actions)
         
         # Calculate rewards with additional incentives
-        rewards = self._calculate_rewards()
+        for snake_id in self.game.snakes:
+            # Penalty for dying
+            if not self.game.snakes[snake_id]['alive']:
+                rewards[snake_id] += self.death_reward
+            
+            # Penalty for each step to encourage efficient paths
+            rewards[snake_id] += self.step_reward
         
         # Extract relevant observation and reward for external snakes
         if self.num_external_snakes == 1:
@@ -219,29 +258,7 @@ class FastSnakeEnv(gym.Env):
             self.last_scores[snake_id] = self.game.scores[snake_id]
         
         return obs, reward, done, False, self._get_info()
-    
-    def _calculate_rewards(self) -> Dict[str, float]:
-        """Calculate rewards for all snakes."""
-        rewards = {}
-        for snake_id in self.game.snakes:
-            reward = 0.0
-            
-            # Reward for eating apple (score increase)
-            current_score = self.game.scores[snake_id]
-            if current_score > self.last_scores[snake_id]:
-                reward += 1.0
-            
-            # Penalty for dying
-            if not self.game.snakes[snake_id]['alive']:
-                reward -= 2.0
-            
-            # Small penalty for each step to encourage efficient paths
-            reward -= 0.01
-            
-            rewards[snake_id] = reward
-        
-        return rewards
-    
+
     def _get_obs(self) -> np.ndarray:
         """Get observations for external snakes."""
         observations = self.game.get_observations()
@@ -309,6 +326,14 @@ class FastSnakeEnv(gym.Env):
         # Get apple positions
         apple_positions = self.game.apples
         apples_str = ", ".join(str(a) for a in apple_positions)
+        
+        # Get banana positions
+        banana_positions = self.game.bananas
+        bananas_str = ", ".join(str(b) for b in banana_positions)
+        
+        # Get fire positions
+        fire_positions = self.game.fires
+        fires_str = ", ".join(str(f) for f in fire_positions)
 
         # Get enemy snake positions
         enemy_strs = []
@@ -327,7 +352,9 @@ class FastSnakeEnv(gym.Env):
         # Construct the final string
         return (
             f"The board size is {self.width}x{self.height}. Normal (X, Y) coordinates are used. Coordinates range from (0, 0) at bottom left to ({self.width-1}, {self.height-1}) at top right.\n"
-            f"Apples at: {apples_str}\n\n"
+            f"Apples at: {apples_str} (worth {self.apple_reward} points each)\n"
+            f"Bananas at: {bananas_str} (worth {self.banana_reward} points each)\n"
+            f"Fires at: {fires_str} (worth {self.fire_reward} points each)\n\n"
             f"Your snake ID: {your_snake_number} which is currently positioned at {your_snake_head_str} with body at {your_snake_body_str}\n\n"
             f"Enemy snakes positions:\n{enemy_str}\n\n"
             f"Game state:\n"

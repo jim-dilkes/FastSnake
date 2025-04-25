@@ -13,21 +13,42 @@ RIGHT = 3
 class FastSnake:
     """Optimized snake game implementation using NumPy arrays."""
     
-    def __init__(self, width: int, height: int, num_apples: int = 1, max_rounds: int = 100, 
-                 apple_rng=None):
+    def __init__(self, 
+                 width: int, 
+                 height: int, 
+                 max_rounds: int = 100, 
+                 num_apples: int = 1, 
+                 apple_reward: int = 1,
+                 apple_rng=None, 
+                 num_bananas: int = 1, 
+                 banana_reward: int = 5,
+                 banana_rng=None, 
+                 num_fires: int = 2, 
+                 fire_reward: int = -1, 
+                 fire_rng=None, 
+                 ):
         # Board representation constants
         self.EMPTY = 100
         self.SNAKE_BODY = 101
         self.APPLE = 102
         self.SNAKE_HEAD = 103
+        self.BANANA = 104
+        self.FIRE = 105
         
         self.width = width
         self.height = height
-        self.num_apples = num_apples
         self.max_rounds = max_rounds
+        self.num_apples = num_apples if num_apples is not None else 0
+        self.apple_reward = apple_reward if apple_reward is not None else 0
+        self.num_bananas = num_bananas if num_bananas is not None else 0
+        self.banana_reward = banana_reward if banana_reward is not None else 0
+        self.num_fires = num_fires if num_fires is not None else 0
+        self.fire_reward = fire_reward if fire_reward is not None else 0
         
         # Use provided RNGs or create new ones
         self.apple_rng = apple_rng if apple_rng is not None else np.random.RandomState()
+        self.banana_rng = banana_rng if banana_rng is not None else np.random.RandomState()
+        self.fire_rng = fire_rng if fire_rng is not None else np.random.RandomState()
         
         # Pre-compute movement deltas for efficiency
         self.MOVE_DELTAS = {
@@ -50,10 +71,18 @@ class FastSnake:
         self.snakes = {}
         self.scores = {}
         
-        # Place initial apples
+        # Place initial objects
         self.apples = []
         for _ in range(self.num_apples):
             self._place_apple()
+            
+        self.bananas = []
+        for _ in range(self.num_bananas):
+            self._place_banana()
+            
+        self.fires = []
+        for _ in range(self.num_fires):
+            self._place_fire()
             
         return self.get_state()
     
@@ -84,6 +113,26 @@ class FastSnake:
         idx = self.apple_rng.randint(len(empty_cells))
         return tuple(empty_cells[idx])
     
+    def _random_free_cell_banana(self) -> Tuple[int, int]:
+        """Find a random empty cell for bananas."""
+        empty_cells = np.argwhere(self.board == self.EMPTY)
+        if len(empty_cells) == 0:
+            raise RuntimeError("No empty cells available")
+        
+        empty_cells = sorted(empty_cells, key=lambda cell: (cell[0], cell[1]))
+        idx = self.banana_rng.randint(len(empty_cells))
+        return tuple(empty_cells[idx])
+    
+    def _random_free_cell_fire(self) -> Tuple[int, int]:
+        """Find a random empty cell for fires."""
+        empty_cells = np.argwhere(self.board == self.EMPTY)
+        if len(empty_cells) == 0:
+            raise RuntimeError("No empty cells available")
+        
+        empty_cells = sorted(empty_cells, key=lambda cell: (cell[0], cell[1]))
+        idx = self.fire_rng.randint(len(empty_cells))
+        return tuple(empty_cells[idx])
+    
     def _place_apple(self) -> None:
         """Place a new apple on an empty cell."""
         try:
@@ -94,6 +143,26 @@ class FastSnake:
         except RuntimeError:
             pass  # No empty cells for apple
     
+    def _place_banana(self) -> None:
+        """Place a new banana on an empty cell."""
+        try:
+            pos = self._random_free_cell_banana()
+            self.bananas.append(pos)
+            y, x = pos
+            self.board[y, x] = self.BANANA
+        except RuntimeError:
+            pass  # No empty cells for banana
+    
+    def _place_fire(self) -> None:
+        """Place a new fire on an empty cell."""
+        try:
+            pos = self._random_free_cell_fire()
+            self.fires.append(pos)
+            y, x = pos
+            self.board[y, x] = self.FIRE
+        except RuntimeError:
+            pass  # No empty cells for fire
+    
     def _update_board(self) -> None:
         """Update the board state efficiently."""
         # Clear the board
@@ -102,6 +171,14 @@ class FastSnake:
         # Place apples
         for ax, ay in self.apples:
             self.board[ay, ax] = self.APPLE
+            
+        # Place bananas
+        for bx, by in self.bananas:
+            self.board[by, bx] = self.BANANA
+            
+        # Place fires
+        for fx, fy in self.fires:
+            self.board[fy, fx] = self.FIRE
         
         # Place snakes
         for snake_id, snake in self.snakes.items():
@@ -190,10 +267,22 @@ class FastSnake:
             
             # Check apple
             if new_head in self.apples:
-                self.scores[snake_id] += 1
-                rewards[snake_id] += 1.0
+                self.scores[snake_id] += self.apple_reward
+                rewards[snake_id] += float(self.apple_reward)
                 self.apples.remove(new_head)
                 self._place_apple()
+            # Check banana
+            elif new_head in self.bananas:
+                self.scores[snake_id] += self.banana_reward
+                rewards[snake_id] += float(self.banana_reward)
+                self.bananas.remove(new_head)
+                self._place_banana()
+            # Check fire
+            elif new_head in self.fires:
+                self.scores[snake_id] += self.fire_reward
+                rewards[snake_id] += float(self.fire_reward)
+                self.fires.remove(new_head)
+                self._place_fire()
             else:
                 snake['positions'].pop()
         
@@ -221,7 +310,7 @@ class FastSnake:
     
     def _get_snake_observation(self, snake_id: str) -> np.ndarray:
         """Get observation from one snake's perspective."""
-        obs = np.zeros((3, self.height, self.width), dtype=np.int8)
+        obs = np.zeros((5, self.height, self.width), dtype=np.int8)
         
         # Channel 0: Current snake
         if self.snakes[snake_id]['alive']:
@@ -236,17 +325,25 @@ class FastSnake:
         # Channel 1: Apples
         for x, y in self.apples:
             obs[1, y, x] = 1
+            
+        # Channel 2: Bananas
+        for x, y in self.bananas:
+            obs[2, y, x] = 1
+            
+        # Channel 3: Fires
+        for x, y in self.fires:
+            obs[3, y, x] = 1
         
-        # Channel 2: Other snakes
+        # Channel 4: Other snakes
         for other_id, snake in self.snakes.items():
             if other_id != snake_id and snake['alive']:
                 positions = snake['positions']
                 head = positions[0]
                 # Mark head
-                obs[2, head[1], head[0]] = 2
+                obs[4, head[1], head[0]] = 2
                 # Mark body
                 for x, y in list(positions)[1:]:
-                    obs[2, y, x] = 1
+                    obs[4, y, x] = 1
         
         return obs
     
@@ -259,6 +356,8 @@ class FastSnake:
         Returns a string representation of the board with:
         # = empty space
         A = apple
+        B = banana
+        F = fire
         T = snake tail
         1,2,3... = snake head (showing player number based on order in self.snakes)
         Now with (0,0) at bottom left and x-axis labels at bottom
@@ -270,6 +369,16 @@ class FastSnake:
         for ax, ay in self.apples:
             if 0 <= ay < self.height and 0 <= ax < self.width:
                 board[ay][ax] = 'A'
+                
+        # Place bananas
+        for bx, by in self.bananas:
+            if 0 <= by < self.height and 0 <= bx < self.width:
+                board[by][bx] = 'B'
+                
+        # Place fires
+        for fx, fy in self.fires:
+            if 0 <= fy < self.height and 0 <= fx < self.width:
+                board[fy][fx] = 'F'
 
         # Place snakes
         for i, (snake_id, snake_data) in enumerate(self.snakes.items(), start=1):

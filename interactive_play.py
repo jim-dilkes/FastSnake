@@ -3,17 +3,23 @@
 import sys
 import tty
 import termios
+import argparse
 # Adjusted imports for running from modules/SnakeBench directory
 from backend.env import FastSnakeEnv
 from backend.core import UP, DOWN, LEFT, RIGHT # Import constants
 
-# --- Game Parameters ---
-WIDTH = 10
-HEIGHT = 10
-NUM_APPLES = 3
-MAX_ROUNDS = 200 # Allow for longer interactive play
-NUM_RANDOM_SNAKES = 1
-# ---------------------
+# --- Default Game Parameters ---
+DEFAULT_WIDTH = 10
+DEFAULT_HEIGHT = 10
+DEFAULT_NUM_APPLES = 3
+DEFAULT_MAX_ROUNDS = 200
+DEFAULT_NUM_RANDOM_SNAKES = 1
+DEFAULT_NUM_BANANAS = 1
+DEFAULT_BANANA_REWARD = 5
+DEFAULT_NUM_FIRES = 2
+DEFAULT_FIRE_REWARD = -1
+DEFAULT_APPLE_REWARD = 1
+# ------------------------------
 
 # --- Action Mapping ---
 # Map keyboard input (lowercase) to game actions
@@ -26,6 +32,21 @@ input_to_action = {
 }
 # --------------------
 
+# Parse command line arguments
+def parse_args():
+    parser = argparse.ArgumentParser(description='Interactive Snake Game')
+    parser.add_argument('--width', type=int, default=DEFAULT_WIDTH, help=f'Board width (default: {DEFAULT_WIDTH})')
+    parser.add_argument('--height', type=int, default=DEFAULT_HEIGHT, help=f'Board height (default: {DEFAULT_HEIGHT})')
+    parser.add_argument('--apples', type=int, default=DEFAULT_NUM_APPLES, help=f'Number of apples (default: {DEFAULT_NUM_APPLES})')
+    parser.add_argument('--apple-reward', type=int, default=DEFAULT_APPLE_REWARD, help=f'Points for eating an apple (default: {DEFAULT_APPLE_REWARD})')
+    parser.add_argument('--rounds', type=int, default=DEFAULT_MAX_ROUNDS, help=f'Maximum rounds (default: {DEFAULT_MAX_ROUNDS})')
+    parser.add_argument('--random-snakes', type=int, default=DEFAULT_NUM_RANDOM_SNAKES, help=f'Number of random snakes (default: {DEFAULT_NUM_RANDOM_SNAKES})')
+    parser.add_argument('--bananas', type=int, default=DEFAULT_NUM_BANANAS, help=f'Number of bananas (default: {DEFAULT_NUM_BANANAS})')
+    parser.add_argument('--banana-reward', type=int, default=DEFAULT_BANANA_REWARD, help=f'Points for eating a banana (default: {DEFAULT_BANANA_REWARD})')
+    parser.add_argument('--fires', type=int, default=DEFAULT_NUM_FIRES, help=f'Number of fires (default: {DEFAULT_NUM_FIRES})')
+    parser.add_argument('--fire-reward', type=int, default=DEFAULT_FIRE_REWARD, help=f'Points for hitting fire (default: {DEFAULT_FIRE_REWARD}, negative means penalty)')
+    return parser.parse_args()
+
 # Helper function to get single character input without needing Enter
 def getch():
     fd = sys.stdin.fileno()
@@ -37,16 +58,29 @@ def getch():
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     return ch
 
-def play_game():
+def play_game(args):
     print("Initializing FastSnakeEnv for interactive play...")
     env = FastSnakeEnv(
-        width=WIDTH,
-        height=HEIGHT,
-        num_apples=NUM_APPLES,
-        max_rounds=MAX_ROUNDS,
+        width=args.width,
+        height=args.height,
+        num_apples=args.apples,
+        max_rounds=args.rounds,
         num_external_snakes=1, # Must be 1 for this script
-        num_random_snakes=NUM_RANDOM_SNAKES
+        num_random_snakes=args.random_snakes,
+        num_bananas=args.bananas,
+        banana_reward=args.banana_reward,
+        num_fires=args.fires,
+        fire_reward=args.fire_reward,
+        apple_reward=args.apple_reward
     )
+
+    print("Game settings:")
+    print(f"  Board: {args.width}x{args.height}")
+    print(f"  Apples: {args.apples} ({args.apple_reward} point{'' if args.apple_reward == 1 else 's'} each)")
+    print(f"  Bananas: {args.bananas} ({args.banana_reward} points each)")
+    print(f"  Fires: {args.fires} ({args.fire_reward} points each)")
+    print(f"  Random snakes: {args.random_snakes}")
+    print(f"  Max rounds: {args.rounds}")
 
     print("Resetting environment...")
     obs, info = env.reset() # Get initial state
@@ -128,4 +162,5 @@ def play_game():
         print(f"Error printing final state: {e}")
 
 if __name__ == "__main__":
-    play_game()
+    args = parse_args()
+    play_game(args)
