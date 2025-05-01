@@ -31,7 +31,8 @@ class FastSnakeEnv(gym.Env):
                  banana_reward: int = None,
                  num_fires: int = None, 
                  fire_reward: int = None,
-                 hill_direction: str = None):
+                 hill_direction: str = None,
+                 destroy_at_bottom: bool = False):
         """
         Initialize Fast Snake Game Environment.
         
@@ -65,6 +66,7 @@ class FastSnakeEnv(gym.Env):
         self.num_fires = num_fires
         self.fire_reward = fire_reward
         self.hill_direction = hill_direction
+        self.destroy_at_bottom = destroy_at_bottom
         
         # Validate hill_direction with fires
         if hill_direction is not None and num_fires is not None and num_fires > 0:
@@ -140,6 +142,7 @@ class FastSnakeEnv(gym.Env):
             fire_reward=self.fire_reward,
             fire_rng=fire_rng,
             hill_direction=self.hill_direction,  # Pass the hill direction to core
+            destroy_at_bottom=self.destroy_at_bottom
         )
         
         # Reset snake tracking

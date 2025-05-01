@@ -48,6 +48,7 @@ def parse_args():
     parser.add_argument('--fire-reward', type=int, default=DEFAULT_FIRE_REWARD, help=f'Points for hitting fire (default: {DEFAULT_FIRE_REWARD}, negative means penalty)')
     parser.add_argument('--hill-direction', type=str, choices=['up', 'down', 'left', 'right', 'none'], default=None, 
                         help='Direction for apples to roll (up, down, left, right, none)')
+    parser.add_argument('--destroy-at-bottom', type=bool, default=False, help='Destroy apples at bottom of board (default: False)')
     return parser.parse_args()
 
 # Helper function to get single character input without needing Enter
@@ -96,7 +97,8 @@ def play_game(args):
         num_fires=args.fires,
         fire_reward=args.fire_reward,
         apple_reward=args.apple_reward,
-        hill_direction=hill_direction
+        hill_direction=hill_direction,
+        destroy_at_bottom=args.destroy_at_bottom
     )
 
     print("Game settings:")

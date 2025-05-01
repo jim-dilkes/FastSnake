@@ -27,6 +27,7 @@ class FastSnake:
                  fire_reward: int = -1, 
                  fire_rng=None,
                  hill_direction: str = None,
+                 destroy_at_bottom: bool = False,
                  ):
         # Board representation constants
         self.EMPTY = 100
@@ -46,6 +47,9 @@ class FastSnake:
         self.num_fires = num_fires if num_fires is not None else 0
         self.fire_reward = fire_reward if fire_reward is not None else 0
         self.hill_direction = hill_direction
+        self.destroy_at_bottom = destroy_at_bottom
+
+        print(f"destroy_at_bottom: {self.destroy_at_bottom}")
         
         # Validate hill_direction
         if hill_direction is not None:
@@ -363,19 +367,23 @@ class FastSnake:
                 rewards[snake_id] += float(self.apple_reward)
                 self.apples.remove(new_head)
                 apples_to_respawn += 1  # Track that we need to spawn an apple later
+                # Don't pop the tail - snake grows when eating an apple
             # Check banana
             elif new_head in self.bananas:
                 self.scores[snake_id] += self.banana_reward
                 rewards[snake_id] += float(self.banana_reward)
                 self.bananas.remove(new_head)
                 self._place_banana()
+                # Don't pop the tail - snake grows when eating a banana
             # Check fire
             elif new_head in self.fires:
                 self.scores[snake_id] += self.fire_reward
                 rewards[snake_id] += float(self.fire_reward)
                 self.fires.remove(new_head)
                 self._place_fire()
+                # Don't pop the tail - snake grows when eating a fire
             else:
+                # Only pop the tail if we didn't eat anything
                 snake['positions'].pop()
         
         # Update the board after all snakes have moved
@@ -437,7 +445,7 @@ class FastSnake:
         delta = self.MOVE_DELTAS[self.DIR_TO_ACTION[self.hill_direction]]
         
         # Track apples eaten during rolling
-        apples_eaten_count = 0
+        apples_removed_count = 0
         
         # Track which original positions have already moved
         # This ensures each apple only moves once per step
@@ -494,7 +502,15 @@ class FastSnake:
                 
                 # Check if the apple would roll off the board
                 if not (0 <= new_x < self.width and 0 <= new_y < self.height):
-                    new_apple_positions.append(apple_pos)  # Stay in place
+                    if self.destroy_at_bottom:
+                        # If destroy_at_bottom is True, remove the apple and count it as eaten
+                        apples_to_remove.append(apple_pos)
+                        apples_removed_count += 1
+                        movement_occurred = True
+                        moved_positions.add(original_pos)
+                    else:
+                        # Otherwise, keep it in place
+                        new_apple_positions.append(apple_pos)
                     continue
                     
                 # Check if the apple would roll into a snake's head
@@ -504,7 +520,7 @@ class FastSnake:
                     self.scores[snake_id] += self.apple_reward
                     # Track this apple for removal
                     apples_to_remove.append(apple_pos)
-                    apples_eaten_count += 1
+                    apples_removed_count += 1
                     movement_occurred = True  # Count as movement for cascade checks
                     # Mark original position as moved
                     moved_positions.add(original_pos)
@@ -543,7 +559,7 @@ class FastSnake:
             self._update_board()
         
         # Return number of apples eaten during rolling
-        return apples_eaten_count
+        return apples_removed_count
     
     def get_observations(self) -> Dict[str, np.ndarray]:
         """Get observations for all snakes."""
