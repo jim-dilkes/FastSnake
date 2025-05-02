@@ -49,8 +49,6 @@ class FastSnake:
         self.hill_direction = hill_direction
         self.destroy_at_bottom = destroy_at_bottom
 
-        print(f"destroy_at_bottom: {self.destroy_at_bottom}")
-        
         # Validate hill_direction
         if hill_direction is not None:
             if hill_direction not in ["up", "down", "left", "right"]:

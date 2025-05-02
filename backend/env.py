@@ -233,7 +233,7 @@ class FastSnakeEnv(gym.Env):
                         chosen_action = random.choice(valid_actions)
                 else:
                     # Trapped, choose a random action (likely dying)
-                    print(f"RandomPlayer {snake_id} is trapped, choosing a random action")
+                    # print(f"RandomPlayer {snake_id} is trapped, choosing a random action")
                     possible_action_keys = list(possible_actions.keys())
                     possible_action_keys.sort()  # Sort for deterministic selection
                     # Use snake_rng if available, otherwise use standard random
