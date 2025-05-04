@@ -11,7 +11,25 @@ LEFT = 2
 RIGHT = 3
 
 class FastSnake:
-    """Optimized snake game implementation using NumPy arrays."""
+    """Optimized snake game implementation using NumPy arrays.
+    
+    Args:
+        width: Width of the game board
+        height: Height of the game board
+        max_rounds: Maximum number of rounds to play
+        num_apples: Number of apples to spawn
+        apple_reward: Reward for eating an apple
+        apple_rng: Random number generator for apple positions
+        num_bananas: Number of bananas to spawn
+        banana_reward: Reward for eating a banana
+        banana_rng: Random number generator for banana positions
+        num_fires: Number of fires to spawn
+        fire_reward: Reward for eating a fire
+        fire_rng: Random number generator for fire positions
+        hill_direction: Direction of the hill (None for no hill)
+        destroy_at_bottom: Whether to destroy snakes at the bottom of the board
+        include_absent_objects: Whether to include absent objects in the observation
+    """
     
     def __init__(self, 
                  width: int, 
@@ -28,7 +46,7 @@ class FastSnake:
                  fire_rng=None,
                  hill_direction: str = None,
                  destroy_at_bottom: bool = False,
-                 ):
+                 include_absent_objects: bool = True):
         # Board representation constants
         self.EMPTY = 100
         self.SNAKE_BODY = 101
@@ -41,14 +59,19 @@ class FastSnake:
         self.height = height
         self.max_rounds = max_rounds
         self.num_apples = num_apples if num_apples is not None else 0
+        self.include_apples = num_apples > 0
         self.apple_reward = apple_reward if apple_reward is not None else 0
         self.num_bananas = num_bananas if num_bananas is not None else 0
+        self.include_bananas = num_bananas > 0
         self.banana_reward = banana_reward if banana_reward is not None else 0
         self.num_fires = num_fires if num_fires is not None else 0
+        self.include_fires = num_fires > 0
         self.fire_reward = fire_reward if fire_reward is not None else 0
         self.hill_direction = hill_direction
         self.destroy_at_bottom = destroy_at_bottom
-
+        self.include_absent_objects = include_absent_objects
+        self.num_object_types = self.include_apples + self.include_bananas + self.include_fires
+        
         # Validate hill_direction
         if hill_direction is not None:
             if hill_direction not in ["up", "down", "left", "right"]:
@@ -559,16 +582,78 @@ class FastSnake:
         # Return number of apples eaten during rolling
         return apples_removed_count
     
-    def get_observations(self) -> Dict[str, np.ndarray]:
+    def get_observations(self, include_absent_objects: bool = None) -> Dict[str, np.ndarray]:
         """Get observations for all snakes."""
+        if include_absent_objects is None:
+            include_absent_objects = self.include_absent_objects
+
         return {
-            snake_id: self._get_snake_observation(snake_id)
+            snake_id: self._get_snake_observation(snake_id, include_absent_objects)
             for snake_id in self.snakes
         }
     
-    def _get_snake_observation(self, snake_id: str) -> np.ndarray:
-        """Get observation from one snake's perspective."""
-        obs = np.zeros((5, self.height, self.width), dtype=np.int8)
+    # def _get_board_observation(self, snake_id: str, include_absent_objects: bool = True) -> np.ndarray:
+    #     """Get observation of the entire board from a specific snake's perspective.
+        
+    #     Returns a 5xHxW array where each channel is:
+    #     - Channel 0: Current snake's head location (binary)
+    #     - Channel 1: All snake bodies (including heads) (binary)
+    #     - Channel 2: Apples (binary)
+    #     - Channel 3: Bananas (binary)
+    #     - Channel 4: Fires (binary)
+    #     """
+    #     # Initialize observation array with zeros
+    #     if not include_absent_objects:
+    #         obs = np.zeros((2 + self.num_object_types, self.height, self.width), dtype=np.int8)
+    #     else:
+    #         obs = np.zeros((5, self.height, self.width), dtype=np.int8)
+        
+    #     # Channel 0: Current snake's head
+    #     if self.snakes[snake_id]['alive']:
+    #         head_pos = self.snakes[snake_id]['positions'][0]
+    #         obs[0, head_pos[1], head_pos[0]] = 1
+        
+    #     # Channel 1: All snake bodies (including heads)
+    #     # Convert all snake positions to numpy array for vectorized operations
+    #     all_positions = []
+    #     for snake in self.snakes.values():
+    #         if snake['alive']:
+    #             all_positions.extend(snake['positions'])
+    #     if all_positions:
+    #         positions = np.array(all_positions)
+    #         obs[1, positions[:, 1], positions[:, 0]] = 1
+        
+    #     # Channel 2: Apples
+    #     if self.apples:
+    #         apples = np.array(self.apples)
+    #         obs[2, apples[:, 1], apples[:, 0]] = 1
+        
+    #     # Channel 3: Bananas
+    #     if self.bananas:
+    #         bananas = np.array(self.bananas)
+    #         obs[3, bananas[:, 1], bananas[:, 0]] = 1
+        
+    #     # Channel 4: Fires
+    #     if self.fires:
+    #         fires = np.array(self.fires)
+    #         obs[4, fires[:, 1], fires[:, 0]] = 1
+        
+        return obs
+    
+    def _get_snake_observation(self, snake_id: str, include_absent_objects: bool = True) -> np.ndarray:
+        """Get observation from one snake's perspective.
+        
+        Args:
+            snake_id: ID of the snake to get observation for
+            include_absent_objects: Whether to include absent objects in the observation
+        """
+        
+        if not include_absent_objects:
+            number_of_channels = 2 + self.num_object_types
+        else:
+            number_of_channels = 5
+
+        obs = np.zeros((number_of_channels, self.height, self.width), dtype=np.int8)
         
         # Channel 0: Current snake
         if self.snakes[snake_id]['alive']:
@@ -579,29 +664,41 @@ class FastSnake:
             # Mark body
             for x, y in list(positions)[1:]:
                 obs[0, y, x] = 1
-        
-        # Channel 1: Apples
-        for x, y in self.apples:
-            obs[1, y, x] = 1
-            
-        # Channel 2: Bananas
-        for x, y in self.bananas:
-            obs[2, y, x] = 1
-            
-        # Channel 3: Fires
-        for x, y in self.fires:
-            obs[3, y, x] = 1
-        
-        # Channel 4: Other snakes
+
+        # Channel 1: Other snakes
         for other_id, snake in self.snakes.items():
             if other_id != snake_id and snake['alive']:
                 positions = snake['positions']
                 head = positions[0]
                 # Mark head
-                obs[4, head[1], head[0]] = 2
+                obs[1, head[1], head[0]] = 2
                 # Mark body
                 for x, y in list(positions)[1:]:
-                    obs[4, y, x] = 1
+                    obs[1, y, x] = 1
+        
+        objects_channel_index = 2
+        # Channel : Apples
+        if include_absent_objects or self.num_apples > 0:
+            for x, y in self.apples:
+                obs[objects_channel_index, y, x] = 1
+            self.apple_channel_index = objects_channel_index
+            objects_channel_index += 1
+
+        # Channel : Bananas
+        if include_absent_objects or self.num_bananas > 0:
+            for x, y in self.bananas:
+                obs[objects_channel_index, y, x] = 1
+            self.banana_channel_index = objects_channel_index
+            objects_channel_index += 1
+            
+        # Channel : Fires
+        if include_absent_objects or self.num_fires > 0:
+            for x, y in self.fires:
+                obs[objects_channel_index, y, x] = 1
+            self.fire_channel_index = objects_channel_index
+            objects_channel_index += 1
+        
+
         
         return obs
     
