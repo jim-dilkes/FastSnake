@@ -28,9 +28,9 @@ class FastSnakeEnv(gym.Env):
                  num_apples: int = 5, 
                  apple_reward: int = 1,
                  num_bananas: int = None,
-                 banana_reward: int = None,
+                 banana_reward: int = 10,
                  num_fires: int = None, 
-                 fire_reward: int = None,
+                 fire_reward: int = -1,
                  hill_direction: str = None,
                  destroy_at_bottom: bool = False):
         """
@@ -367,8 +367,8 @@ class FastSnakeEnv(gym.Env):
         return (
             f"The board size is {self.width}x{self.height}. Normal (X, Y) coordinates are used. Coordinates range from (0, 0) at bottom left to ({self.width-1}, {self.height-1}) at top right.\n"
             f"Apples at: {apples_str} (worth {self.apple_reward} points each)\n"
-            f"Bananas at: {bananas_str} (worth {self.banana_reward} points each)\n"
-            f"Fires at: {fires_str} (worth {self.fire_reward} points each)\n"
+            f"Bananas at: {bananas_str} (worth {self.banana_reward} points each)\n" if self.num_bananas else ""
+            f"Fires at: {fires_str} (worth {self.fire_reward} points each)\n" if self.num_fires else ""
             f"{hill_direction_str}\n\n"
             f"Your snake ID: {your_snake_number} which is currently positioned at {your_snake_head_str} with body at {your_snake_body_str}\n\n"
             f"Enemy snakes positions:\n{enemy_str}\n\n"
