@@ -1,5 +1,3 @@
-# fast_snake/env.py
-
 import gym
 from gym import spaces
 import numpy as np
@@ -32,7 +30,8 @@ class FastSnakeEnv(gym.Env):
                  num_fires: int = None, 
                  fire_reward: int = -1,
                  hill_direction: str = None,
-                 destroy_at_bottom: bool = False):
+                 destroy_at_bottom: bool = False,
+                 include_absent_objects: bool = None):
         """
         Initialize Fast Snake Game Environment.
         
@@ -49,6 +48,7 @@ class FastSnakeEnv(gym.Env):
             fire_reward: Points deducted for walking on fire
             apple_reward: Points awarded for eating an apple
             hill_direction: Direction of the hill the apples will roll down(up, down, left, right)
+            include_absent_objects: Whether to include absent objects in the observation
         """
         super().__init__()
         
@@ -67,7 +67,7 @@ class FastSnakeEnv(gym.Env):
         self.fire_reward = fire_reward
         self.hill_direction = hill_direction
         self.destroy_at_bottom = destroy_at_bottom
-        
+        self.include_absent_objects = include_absent_objects
         # Validate hill_direction with fires
         if hill_direction is not None and num_fires is not None and num_fires > 0:
             raise ValueError("hill_direction is not compatible with fires. Please set num_fires to 0 or hill_direction to None.")
@@ -78,23 +78,28 @@ class FastSnakeEnv(gym.Env):
         else:
             self.action_space = spaces.Tuple([spaces.Discrete(4)] * num_external_snakes)
         
-        # Define observation spaces with 5 channels instead of 3
-        # Channel 0: Current snake (1=body, 2=head)
-        # Channel 1: Apples (1=apple)
-        # Channel 2: Bananas (1=banana)
-        # Channel 3: Fires (1=fire)
-        # Channel 4: Other snakes (1=body, 2=head)
-        obs_shape = (5, height, width)
+        # Define observation spaces with 5 channels
+        # Channel 0: Current snake's head location (binary)
+        # Channel 1: All snake bodies (including heads) (binary)
+        # Channel 2: Apples (binary)
+        # Channel 3: Bananas (binary)
+        # Channel 4: Fires (binary)
+
+        # If include_absent_objects is False, the observation space will be 2 + which of apples, bananas, and fires are present
+        if not include_absent_objects:
+            obs_shape = (2 + (num_apples > 0) + (num_bananas > 0) + (num_fires > 0), height, width)
+        else:
+            obs_shape = (5, height, width)
         if num_external_snakes == 1:
             self.observation_space = spaces.Box(
-                low=0, high=2,
+                low=0, high=1,  # Binary values only
                 shape=obs_shape,
                 dtype=np.int8
             )
         else:
             self.observation_space = spaces.Tuple([
                 spaces.Box(
-                    low=0, high=2,
+                    low=0, high=1,  # Binary values only
                     shape=obs_shape,
                     dtype=np.int8
                 )
@@ -142,7 +147,8 @@ class FastSnakeEnv(gym.Env):
             fire_reward=self.fire_reward,
             fire_rng=fire_rng,
             hill_direction=self.hill_direction,  # Pass the hill direction to core
-            destroy_at_bottom=self.destroy_at_bottom
+            destroy_at_bottom=self.destroy_at_bottom,
+            include_absent_objects=self.include_absent_objects        
         )
         
         # Reset snake tracking
@@ -167,7 +173,14 @@ class FastSnakeEnv(gym.Env):
         return self._get_obs(), self._get_info()
     
     def step(self, action) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
-        """Execute one environment step."""
+        """Execute one environment step.
+        Returns:
+            obs: Observation
+            reward: Reward
+            done: Whether the episode is over
+            truncated: Whether the episode is truncated
+            info: Additional info
+        """
         # Convert action(s) to dict format
         if self.num_external_snakes == 1:
             actions = {self.external_snake_ids[0]: action}
@@ -272,7 +285,7 @@ class FastSnakeEnv(gym.Env):
 
     def _get_obs(self) -> np.ndarray:
         """Get observations for external snakes."""
-        observations = self.game.get_observations()
+        observations = self.game.get_observations(self.include_absent_objects)
         
         if self.num_external_snakes == 1:
             return observations[self.external_snake_ids[0]]
@@ -354,7 +367,7 @@ class FastSnakeEnv(gym.Env):
                 positions = list(snake_data['positions'])
                 head_pos = positions[0]
                 body_pos = positions[1:]
-                enemy_strs.append(f"* Snake #{enemy_number} is at position {head_pos} with body at {body_pos}")
+                enemy_strs.append(f"* Snake #{enemy_number} has head at position {head_pos} and body segments at {body_pos}")
         enemy_str = "\n".join(enemy_strs)
 
         # Get board representation using the updated render_text
@@ -370,7 +383,7 @@ class FastSnakeEnv(gym.Env):
             f"Bananas at: {bananas_str} (worth {self.banana_reward} points each)\n" if self.num_bananas else ""
             f"Fires at: {fires_str} (worth {self.fire_reward} points each)\n" if self.num_fires else ""
             f"{hill_direction_str}\n\n"
-            f"Your snake ID: {your_snake_number} which is currently positioned at {your_snake_head_str} with body at {your_snake_body_str}\n\n"
+            f"Your snake ID: {your_snake_number} with head positioned at {your_snake_head_str} and body segments at {your_snake_body_str}\n\n"
             f"Enemy snakes positions:\n{enemy_str}\n\n"
             f"Game state:\n"
             f"{board_str}\n\n"
