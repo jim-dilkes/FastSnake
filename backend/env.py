@@ -25,13 +25,14 @@ class FastSnakeEnv(gym.Env):
                  step_reward: int = -0.01,
                  num_apples: int = 5, 
                  apple_reward: int = 1,
-                 num_bananas: int = None,
+                 num_bananas: int = 0,
                  banana_reward: int = 10,
-                 num_fires: int = None, 
+                 num_fires: int = 0, 
                  fire_reward: int = -1,
                  hill_direction: str = None,
                  destroy_at_bottom: bool = False,
-                 include_absent_objects: bool = None):
+                 include_absent_objects: bool = None,
+                 render_board_as_text: bool = True):
         """
         Initialize Fast Snake Game Environment.
         
@@ -49,6 +50,7 @@ class FastSnakeEnv(gym.Env):
             apple_reward: Points awarded for eating an apple
             hill_direction: Direction of the hill the apples will roll down(up, down, left, right)
             include_absent_objects: Whether to include absent objects in the observation
+            render_board_as_text: Whether to render the board as text
         """
         super().__init__()
         
@@ -68,6 +70,8 @@ class FastSnakeEnv(gym.Env):
         self.hill_direction = hill_direction
         self.destroy_at_bottom = destroy_at_bottom
         self.include_absent_objects = include_absent_objects
+        self.render_board_as_text = render_board_as_text
+
         # Validate hill_direction with fires
         if hill_direction is not None and num_fires is not None and num_fires > 0:
             raise ValueError("hill_direction is not compatible with fires. Please set num_fires to 0 or hill_direction to None.")
@@ -87,6 +91,7 @@ class FastSnakeEnv(gym.Env):
 
         # If include_absent_objects is False, the observation space will be 2 + which of apples, bananas, and fires are present
         if not include_absent_objects:
+            # Handle None values by treating them as 0
             obs_shape = (2 + (num_apples > 0) + (num_bananas > 0) + (num_fires > 0), height, width)
         else:
             obs_shape = (5, height, width)
@@ -350,15 +355,17 @@ class FastSnakeEnv(gym.Env):
         # Get apple positions
         apple_positions = self.game.apples
         apples_str = ", ".join(str(a) for a in apple_positions)
+        apples_str = f"Apples at: {apples_str} (worth {self.apple_reward} points each)\n" if self.num_apples > 0 else ""
         
         # Get banana positions
         banana_positions = self.game.bananas
         bananas_str = ", ".join(str(b) for b in banana_positions)
+        bananas_str = f"Bananas at: {bananas_str} (worth {self.banana_reward} points each)\n" if self.num_bananas > 0 else ""
         
         # Get fire positions
         fire_positions = self.game.fires
         fires_str = ", ".join(str(f) for f in fire_positions)
-
+        fires_str = f"Fires at: {fires_str} (worth {self.fire_reward} points each)\n" if self.num_fires > 0 else ""
         # Get enemy snake positions
         enemy_strs = []
         for sid, snake_data in self.game.snakes.items():
@@ -371,20 +378,22 @@ class FastSnakeEnv(gym.Env):
         enemy_str = "\n".join(enemy_strs)
 
         # Get board representation using the updated render_text
-        board_str = self.game.render_text()
+        board_str = ("Layout:\n" + self.game.render_text() + "\n") if self.render_board_as_text else ""
         
         # Include hill direction information if applicable
-        hill_direction_str = f"Apples roll {self.hill_direction}" if self.hill_direction else "Apples don't roll"
+        hill_direction_str = f"Apples roll {self.hill_direction}" if self.hill_direction else ""
 
         # Construct the final string
         return (
-            f"The board size is {self.width}x{self.height}. Normal (X, Y) coordinates are used. Coordinates range from (0, 0) at bottom left to ({self.width-1}, {self.height-1}) at top right.\n"
-            f"Apples at: {apples_str} (worth {self.apple_reward} points each)\n"
-            f"Bananas at: {bananas_str} (worth {self.banana_reward} points each)\n" if self.num_bananas else ""
-            f"Fires at: {fires_str} (worth {self.fire_reward} points each)\n" if self.num_fires else ""
-            f"{hill_direction_str}\n\n"
-            f"Your snake ID: {your_snake_number} with head positioned at {your_snake_head_str} and body segments at {your_snake_body_str}\n\n"
-            f"Enemy snakes positions:\n{enemy_str}\n\n"
-            f"Game state:\n"
-            f"{board_str}\n\n"
+            f"The board size is {self.width}x{self.height}. Normal (X, Y) coordinates are used to denote positions.\n"
+            f"LEFT decreases X, RIGHT increases X, UP increases Y, and DOWN decreases Y.\n"
+            f"Coordinates range from (0, 0) at bottom left to ({self.width-1}, {self.height-1}) at top right.\n"
+            f"{apples_str}"
+            f"{bananas_str}"
+            f"{fires_str}"
+            f"{hill_direction_str}"
+            f"\n\nEnemy snakes positions:\n{enemy_str}\n\n"
+            f"Your snake head (ID {your_snake_number}) is positioned at {your_snake_head_str} and body segments at {your_snake_body_str}\n"
+            f"You are controlling the snake at {your_snake_head_str}"
+            f"{board_str}"
         )
