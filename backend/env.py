@@ -278,15 +278,20 @@ class FastSnakeEnv(gym.Env):
         if self.num_external_snakes == 1:
             obs = observations[self.external_snake_ids[0]]
             reward = rewards[self.external_snake_ids[0]]
+            success = reward > 0
         else:
             obs = tuple(observations[sid] for sid in self.external_snake_ids)
             reward = tuple(rewards[sid] for sid in self.external_snake_ids)
+            success = tuple(reward > 0 for reward in rewards)
         
         # Update last scores
         for snake_id in self.game.snakes:
             self.last_scores[snake_id] = self.game.scores[snake_id]
+
+        info = self._get_info() 
+        info['success'] = success
         
-        return obs, reward, done, False, self._get_info()
+        return obs, reward, done, False, info
 
     def _get_obs(self) -> np.ndarray:
         """Get observations for external snakes."""
