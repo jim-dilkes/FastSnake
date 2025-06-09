@@ -706,7 +706,7 @@ class FastSnake:
         """Get the raw board state."""
         return self.board.copy()
     
-    def render_text(self) -> str:
+    def render_text(self, print_axes: bool = False) -> str:
         """
         Returns a string representation of the board with:
         # = empty space
@@ -753,9 +753,12 @@ class FastSnake:
         result = []
         # Print rows in reverse order (bottom to top)
         for y in range(self.height - 1, -1, -1):
-            result.append(f"{y:2d} {' '.join(board[y])}")
-
-        # Add x-axis labels at the bottom
-        result.append("   " + " ".join(str(i) for i in range(self.width)))
+            if print_axes:
+                result.append(f"{y:2d} {' '.join(board[y])}")
+            else:
+                result.append(' '.join(board[y]))
+        if print_axes:
+            # Add x-axis labels at the bottom
+            result.append("   " + " ".join(str(i) for i in range(self.width)))
 
         return "\n".join(result)
