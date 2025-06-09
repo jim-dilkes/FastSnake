@@ -268,13 +268,14 @@ class FastSnakeEnv(gym.Env):
 
         # Execute game step
         observations, rewards, done, info = self.game.step(actions)
+        success_dict = info['success']
         
         # Calculate rewards with additional incentives
         for snake_id in self.game.snakes:
             # Penalty for dying
             if not self.game.snakes[snake_id]['alive']:
                 rewards[snake_id] += self.death_reward
-            
+                        
             # Penalty for each step to encourage efficient paths
             rewards[snake_id] += self.step_reward
         
@@ -282,6 +283,8 @@ class FastSnakeEnv(gym.Env):
         if self.num_external_snakes == 1:
             obs = observations[self.external_snake_ids[0]]
             reward = rewards[self.external_snake_ids[0]]
+            success = success_dict[self.external_snake_ids[0]]
+
         else:
             obs = tuple(observations[sid] for sid in self.external_snake_ids)
             reward = tuple(rewards[sid] for sid in self.external_snake_ids)
@@ -289,8 +292,9 @@ class FastSnakeEnv(gym.Env):
         # Update last scores
         for snake_id in self.game.snakes:
             self.last_scores[snake_id] = self.game.scores[snake_id]
-        
-        return obs, reward, done, False, self._get_info()
+        info = self._get_info()
+        info['success'] = success
+        return obs, reward, done, False, info
 
     def _get_obs(self) -> np.ndarray:
         """Get observations for external snakes."""

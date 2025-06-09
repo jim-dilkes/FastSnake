@@ -169,6 +169,7 @@ def play_game(args):
 
             total_reward += reward
             print(f"Action taken. Reward this step: {reward:.2f}")
+            print(f"Success: {info['success']}")
         except Exception as e:
             print(f"\nError during environment step: {e}")
             import traceback

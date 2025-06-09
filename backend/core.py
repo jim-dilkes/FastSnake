@@ -359,6 +359,7 @@ class FastSnake:
                         rewards[snake_id] -= 1.0
                         
         # ---- PHASE 3: Process individual snake moves and collisions ----
+        success = {sid: False for sid in self.snakes}
         for snake_id, new_head in new_heads.items():
             snake = self.snakes[snake_id]
             if not snake['alive']:
@@ -388,6 +389,8 @@ class FastSnake:
                 rewards[snake_id] += float(self.apple_reward)
                 self.apples.remove(new_head)
                 apples_to_respawn += 1  # Track that we need to spawn an apple later
+                if self.apple_reward > 0:
+                    success[snake_id] = True
                 # Don't pop the tail - snake grows when eating an apple
             # Check banana
             elif new_head in self.bananas:
@@ -395,6 +398,8 @@ class FastSnake:
                 rewards[snake_id] += float(self.banana_reward)
                 self.bananas.remove(new_head)
                 self._place_banana()
+                if self.banana_reward > 0:
+                    success[snake_id] = True
                 # Don't pop the tail - snake grows when eating a banana
             # Check fire
             elif new_head in self.fires:
@@ -402,6 +407,8 @@ class FastSnake:
                 rewards[snake_id] += float(self.fire_reward)
                 self.fires.remove(new_head)
                 self._place_fire()
+                if self.fire_reward > 0:
+                    success[snake_id] = True
                 # Don't pop the tail - snake grows when eating a fire
             else:
                 # Only pop the tail if we didn't eat anything
@@ -443,11 +450,12 @@ class FastSnake:
         alive_snakes = sum(s['alive'] for s in self.snakes.values())
         self.game_over = (alive_snakes <= 1) or (self.round_number >= self.max_rounds)
         
+        # Success is a boolean indicating whether any snake ate an item with positive reward
         return (
             self.get_observations(),
             rewards,
             self.game_over,
-            {'scores': self.scores.copy(), 'round': self.round_number}
+            {'scores': self.scores.copy(), 'round': self.round_number, 'success': success}
         )
     
     def _roll_apples(self) -> int:
