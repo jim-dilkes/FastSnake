@@ -32,7 +32,9 @@ class FastSnakeEnv(gym.Env):
                  hill_direction: str = None,
                  destroy_at_bottom: bool = False,
                  include_absent_objects: bool = None,
-                 render_board_as_text: bool = True):
+                 print_visualization: bool = True,
+                 print_coordinates: bool = True,
+                 print_axes: bool = False):
         """
         Initialize Fast Snake Game Environment.
         
@@ -70,7 +72,9 @@ class FastSnakeEnv(gym.Env):
         self.hill_direction = hill_direction
         self.destroy_at_bottom = destroy_at_bottom
         self.include_absent_objects = include_absent_objects
-        self.render_board_as_text = render_board_as_text
+        self.print_visualization = print_visualization
+        self.print_coordinates = print_coordinates
+        self.print_axes = print_axes
 
         # Validate hill_direction with fires
         if hill_direction is not None and num_fires is not None and num_fires > 0:
@@ -264,13 +268,14 @@ class FastSnakeEnv(gym.Env):
 
         # Execute game step
         observations, rewards, done, info = self.game.step(actions)
+        success_dict = info['success']
         
         # Calculate rewards with additional incentives
         for snake_id in self.game.snakes:
             # Penalty for dying
             if not self.game.snakes[snake_id]['alive']:
                 rewards[snake_id] += self.death_reward
-            
+                        
             # Penalty for each step to encourage efficient paths
             rewards[snake_id] += self.step_reward
         
@@ -278,7 +283,8 @@ class FastSnakeEnv(gym.Env):
         if self.num_external_snakes == 1:
             obs = observations[self.external_snake_ids[0]]
             reward = rewards[self.external_snake_ids[0]]
-            success = reward > 0
+            success = success_dict[self.external_snake_ids[0]]
+
         else:
             obs = tuple(observations[sid] for sid in self.external_snake_ids)
             reward = tuple(rewards[sid] for sid in self.external_snake_ids)
@@ -287,10 +293,8 @@ class FastSnakeEnv(gym.Env):
         # Update last scores
         for snake_id in self.game.snakes:
             self.last_scores[snake_id] = self.game.scores[snake_id]
-
-        info = self._get_info() 
+        info = self._get_info()
         info['success'] = success
-        
         return obs, reward, done, False, info
 
     def _get_obs(self) -> np.ndarray:
@@ -357,20 +361,11 @@ class FastSnakeEnv(gym.Env):
             your_snake_head_str = str(your_snake_head)
             your_snake_body_str = str(your_snake_body)
 
-        # Get apple positions
+        # Get object positions
         apple_positions = self.game.apples
-        apples_str = ", ".join(str(a) for a in apple_positions)
-        apples_str = f"Apples at: {apples_str} (worth {self.apple_reward} points each)\n" if self.num_apples > 0 else ""
-        
-        # Get banana positions
         banana_positions = self.game.bananas
-        bananas_str = ", ".join(str(b) for b in banana_positions)
-        bananas_str = f"Bananas at: {bananas_str} (worth {self.banana_reward} points each)\n" if self.num_bananas > 0 else ""
-        
-        # Get fire positions
         fire_positions = self.game.fires
-        fires_str = ", ".join(str(f) for f in fire_positions)
-        fires_str = f"Fires at: {fires_str} (worth {self.fire_reward} points each)\n" if self.num_fires > 0 else ""
+
         # Get enemy snake positions
         enemy_strs = []
         for sid, snake_data in self.game.snakes.items():
@@ -379,26 +374,28 @@ class FastSnakeEnv(gym.Env):
                 positions = list(snake_data['positions'])
                 head_pos = positions[0]
                 body_pos = positions[1:]
-                enemy_strs.append(f"* Snake #{enemy_number} has head at position {head_pos} and body segments at {body_pos}")
+                enemy_strs.append(f"* Snake ID {enemy_number} has head at position {head_pos} and body segments at {body_pos}")
         enemy_str = "\n".join(enemy_strs)
 
-        # Get board representation using the updated render_text
-        board_str = ("Layout:\n" + self.game.render_text() + "\n") if self.render_board_as_text else ""
-        
-        # Include hill direction information if applicable
-        hill_direction_str = f"Apples roll {self.hill_direction}" if self.hill_direction else ""
+
+        components = []
+        if self.print_coordinates:
+            components.append(f"The board size is {self.width}x{self.height}. Normal (X, Y) coordinates are used to denote positions.\n"
+                              f"LEFT decreases X, RIGHT increases X, UP increases Y, and DOWN decreases Y.\n"
+                              f"Coordinates range from (0, 0) at bottom left to ({self.width-1}, {self.height-1}) at top right.")
+            if self.num_apples > 0:
+                components.append(f"Apples at: {', '.join(str(a) for a in apple_positions)} (worth {self.apple_reward} points each)")
+            if self.num_bananas > 0:
+                components.append(f"Bananas at: {', '.join(str(b) for b in banana_positions)} (worth {self.banana_reward} points each)")
+            if self.num_fires > 0:
+                components.append(f"Fires at: {', '.join(str(f) for f in fire_positions)} (worth {self.fire_reward} points each)")
+            components.append(f"Enemy snakes positions:\n{enemy_str}\n"
+                              f"Your snake head (ID {your_snake_number}) is positioned at {your_snake_head_str} and body segments at {your_snake_body_str}\n"
+                              f"You are controlling the snake at {your_snake_head_str}")
+        if self.hill_direction:
+            components.append(f"Apples roll along the hill in the {self.hill_direction} direction.")
+        if self.print_visualization:
+            components.append(self.game.render_text(print_axes=self.print_axes))
 
         # Construct the final string
-        return (
-            f"The board size is {self.width}x{self.height}. Normal (X, Y) coordinates are used to denote positions.\n"
-            f"LEFT decreases X, RIGHT increases X, UP increases Y, and DOWN decreases Y.\n"
-            f"Coordinates range from (0, 0) at bottom left to ({self.width-1}, {self.height-1}) at top right.\n"
-            f"{apples_str}"
-            f"{bananas_str}"
-            f"{fires_str}"
-            f"{hill_direction_str}"
-            f"\n\nEnemy snakes positions:\n{enemy_str}\n\n"
-            f"Your snake head (ID {your_snake_number}) is positioned at {your_snake_head_str} and body segments at {your_snake_body_str}\n"
-            f"You are controlling the snake at {your_snake_head_str}"
-            f"{board_str}"
-        )
+        return "\n".join(components)

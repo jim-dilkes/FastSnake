@@ -359,6 +359,7 @@ class FastSnake:
                         rewards[snake_id] -= 1.0
                         
         # ---- PHASE 3: Process individual snake moves and collisions ----
+        success = {sid: False for sid in self.snakes}
         for snake_id, new_head in new_heads.items():
             snake = self.snakes[snake_id]
             if not snake['alive']:
@@ -388,6 +389,8 @@ class FastSnake:
                 rewards[snake_id] += float(self.apple_reward)
                 self.apples.remove(new_head)
                 apples_to_respawn += 1  # Track that we need to spawn an apple later
+                if self.apple_reward > 0:
+                    success[snake_id] = True
                 # Don't pop the tail - snake grows when eating an apple
             # Check banana
             elif new_head in self.bananas:
@@ -395,6 +398,8 @@ class FastSnake:
                 rewards[snake_id] += float(self.banana_reward)
                 self.bananas.remove(new_head)
                 self._place_banana()
+                if self.banana_reward > 0:
+                    success[snake_id] = True
                 # Don't pop the tail - snake grows when eating a banana
             # Check fire
             elif new_head in self.fires:
@@ -402,6 +407,8 @@ class FastSnake:
                 rewards[snake_id] += float(self.fire_reward)
                 self.fires.remove(new_head)
                 self._place_fire()
+                if self.fire_reward > 0:
+                    success[snake_id] = True
                 # Don't pop the tail - snake grows when eating a fire
             else:
                 # Only pop the tail if we didn't eat anything
@@ -443,11 +450,12 @@ class FastSnake:
         alive_snakes = sum(s['alive'] for s in self.snakes.values())
         self.game_over = (alive_snakes <= 1) or (self.round_number >= self.max_rounds)
         
+        # Success is a boolean indicating whether any snake ate an item with positive reward
         return (
             self.get_observations(),
             rewards,
             self.game_over,
-            {'scores': self.scores.copy(), 'round': self.round_number}
+            {'scores': self.scores.copy(), 'round': self.round_number, 'success': success}
         )
     
     def _roll_apples(self) -> int:
@@ -706,7 +714,7 @@ class FastSnake:
         """Get the raw board state."""
         return self.board.copy()
     
-    def render_text(self) -> str:
+    def render_text(self, print_axes: bool = False) -> str:
         """
         Returns a string representation of the board with:
         # = empty space
@@ -717,8 +725,19 @@ class FastSnake:
         1,2,3... = snake head (showing player number based on order in self.snakes)
         Now with (0,0) at bottom left and x-axis labels at bottom
         """
+
+        key_str = (
+            "- 1: Your snake head\n"
+            "- 2: Enemy snake head\n"
+            "- T: Snake body\n"
+            "- A: Apple\n" if self.num_apples > 0 else ""
+            "- B: Banana\n" if self.num_bananas > 0 else ""
+            "- F: Fire\n" if self.num_fires > 0 else ""
+            "- _: Empty space\n"
+        )
+
         # Create empty board
-        board = [['#' for _ in range(self.width)] for _ in range(self.height)]
+        board = [['_' for _ in range(self.width)] for _ in range(self.height)]
 
         # Place apples
         for ax, ay in self.apples:
@@ -751,11 +770,16 @@ class FastSnake:
 
         # Build the string representation
         result = []
+        
+        result.append(key_str)
         # Print rows in reverse order (bottom to top)
         for y in range(self.height - 1, -1, -1):
-            result.append(f"{y:2d} {' '.join(board[y])}")
-
-        # Add x-axis labels at the bottom
-        result.append("   " + " ".join(str(i) for i in range(self.width)))
+            if print_axes:
+                result.append(f"{y:2d} {' '.join(board[y])}")
+            else:
+                result.append(' '.join(board[y]))
+        if print_axes:
+            # Add x-axis labels at the bottom
+            result.append("   " + " ".join(str(i) for i in range(self.width)))
 
         return "\n".join(result)
