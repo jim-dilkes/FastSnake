@@ -727,6 +727,7 @@ class FastSnake:
         """
 
         key_str = (
+            "The meaning of each symbol in the state is:\n"
             "- 1: Your snake head\n"
             "- 2: Enemy snake head\n"
             "- T: Snake body\n"
@@ -772,6 +773,7 @@ class FastSnake:
         result = []
         
         result.append(key_str)
+        result.append("State:")
         # Print rows in reverse order (bottom to top)
         for y in range(self.height - 1, -1, -1):
             if print_axes:
