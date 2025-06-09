@@ -98,7 +98,10 @@ def play_game(args):
         fire_reward=args.fire_reward,
         apple_reward=args.apple_reward,
         hill_direction=hill_direction,
-        destroy_at_bottom=args.destroy_at_bottom
+        destroy_at_bottom=args.destroy_at_bottom,
+        print_visualization=True,
+        print_coordinates=True,
+        print_axes=False
     )
 
     print("Game settings:")

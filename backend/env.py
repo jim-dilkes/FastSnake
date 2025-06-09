@@ -369,7 +369,7 @@ class FastSnakeEnv(gym.Env):
                 positions = list(snake_data['positions'])
                 head_pos = positions[0]
                 body_pos = positions[1:]
-                enemy_strs.append(f"* Snake #{enemy_number} has head at position {head_pos} and body segments at {body_pos}")
+                enemy_strs.append(f"* Snake ID {enemy_number} has head at position {head_pos} and body segments at {body_pos}")
         enemy_str = "\n".join(enemy_strs)
 
 
@@ -384,7 +384,7 @@ class FastSnakeEnv(gym.Env):
                 components.append(f"Bananas at: {', '.join(str(b) for b in banana_positions)} (worth {self.banana_reward} points each)")
             if self.num_fires > 0:
                 components.append(f"Fires at: {', '.join(str(f) for f in fire_positions)} (worth {self.fire_reward} points each)")
-            components.append(f"\n\nEnemy snakes positions:\n{enemy_str}\n"
+            components.append(f"Enemy snakes positions:\n{enemy_str}\n"
                               f"Your snake head (ID {your_snake_number}) is positioned at {your_snake_head_str} and body segments at {your_snake_body_str}\n"
                               f"You are controlling the snake at {your_snake_head_str}")
         if self.hill_direction:

@@ -717,8 +717,19 @@ class FastSnake:
         1,2,3... = snake head (showing player number based on order in self.snakes)
         Now with (0,0) at bottom left and x-axis labels at bottom
         """
+
+        key_str = (
+            "- 1: Your snake head\n"
+            "- 2: Enemy snake head\n"
+            "- T: Snake body\n"
+            "- A: Apple\n" if self.num_apples > 0 else ""
+            "- B: Banana\n" if self.num_bananas > 0 else ""
+            "- F: Fire\n" if self.num_fires > 0 else ""
+            "- _: Empty space\n"
+        )
+
         # Create empty board
-        board = [['#' for _ in range(self.width)] for _ in range(self.height)]
+        board = [['_' for _ in range(self.width)] for _ in range(self.height)]
 
         # Place apples
         for ax, ay in self.apples:
@@ -751,6 +762,8 @@ class FastSnake:
 
         # Build the string representation
         result = []
+        
+        result.append(key_str)
         # Print rows in reverse order (bottom to top)
         for y in range(self.height - 1, -1, -1):
             if print_axes:
