@@ -731,11 +731,11 @@ class FastSnake:
             "- 1: Your snake head\n"
             "- 2: Enemy snake head\n"
             "- T: Snake body\n"
-            "- A: Apple\n" if self.num_apples > 0 else ""
-            "- B: Banana\n" if self.num_bananas > 0 else ""
-            "- F: Fire\n" if self.num_fires > 0 else ""
-            "- _: Empty space\n"
         )
+        key_str +=  "- A: Apple\n" if self.num_apples > 0 else ""
+        key_str +=  "- B: Banana\n" if self.num_bananas > 0 else ""
+        key_str +=  "- F: Fire\n" if self.num_fires > 0 else ""
+        key_str +=  "- _: Empty space"
 
         # Create empty board
         board = [['_' for _ in range(self.width)] for _ in range(self.height)]
