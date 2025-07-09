@@ -714,60 +714,130 @@ class FastSnake:
         """Get the raw board state."""
         return self.board.copy()
     
-    def render_text(self, print_axes: bool = False) -> str:
+    def render_text(self, print_axes: bool = False, use_color_mode: bool = False) -> str:
         """
-        Returns a string representation of the board with:
+        Returns a string representation of the board.
+        
+        If use_color_mode is False (default):
         # = empty space
         A = apple
         B = banana
         F = fire
         T = snake tail
         1,2,3... = snake head (showing player number based on order in self.snakes)
-        Now with (0,0) at bottom left and x-axis labels at bottom
+        
+        If use_color_mode is True:
+        · = empty space (blank)
+        🍎 = apple (red)
+        🍌 = banana (yellow)
+        🔥 = fire (red)
+        ■ = snake body (green for player 1, red for others)
+        1,2,3... = snake head (colored by player)
         """
+        if not use_color_mode:
+            # Original visualization mode
+            key_str = (
+                "The meaning of each symbol in the state is:\n"
+                "- 1: Your snake head\n"
+                "- 2: Enemy snake head\n"
+                "- T: Snake body\n"
+            )
+            key_str +=  "- A: Apple\n" if self.num_apples > 0 else ""
+            key_str +=  "- B: Banana\n" if self.num_bananas > 0 else ""
+            key_str +=  "- F: Fire\n" if self.num_fires > 0 else ""
+            key_str +=  "- _: Empty space"
 
-        key_str = (
-            "The meaning of each symbol in the state is:\n"
-            "- 1: Your snake head\n"
-            "- 2: Enemy snake head\n"
-            "- T: Snake body\n"
-        )
-        key_str +=  "- A: Apple\n" if self.num_apples > 0 else ""
-        key_str +=  "- B: Banana\n" if self.num_bananas > 0 else ""
-        key_str +=  "- F: Fire\n" if self.num_fires > 0 else ""
-        key_str +=  "- _: Empty space"
+            # Create empty board
+            board = [['_' for _ in range(self.width)] for _ in range(self.height)]
 
-        # Create empty board
-        board = [['_' for _ in range(self.width)] for _ in range(self.height)]
+            # Place apples
+            for ax, ay in self.apples:
+                if 0 <= ay < self.height and 0 <= ax < self.width:
+                    board[ay][ax] = 'A'
+                    
+            # Place bananas
+            for bx, by in self.bananas:
+                if 0 <= by < self.height and 0 <= bx < self.width:
+                    board[by][bx] = 'B'
+                    
+            # Place fires
+            for fx, fy in self.fires:
+                if 0 <= fy < self.height and 0 <= fx < self.width:
+                    board[fy][fx] = 'F'
 
-        # Place apples
-        for ax, ay in self.apples:
-            if 0 <= ay < self.height and 0 <= ax < self.width:
-                board[ay][ax] = 'A'
+            # Place snakes
+            for i, (snake_id, snake_data) in enumerate(self.snakes.items(), start=1):
+                if not snake_data['alive']:
+                    continue
+
+                positions = snake_data['positions']
+                # Place snake body
+                for pos_idx, (x, y) in enumerate(positions):
+                    if 0 <= y < self.height and 0 <= x < self.width:
+                        if pos_idx == 0:  # Head
+                            board[y][x] = str(i)  # Use snake number (1, 2, 3...) for head
+                        else:  # Body/tail
+                            board[y][x] = 'T'
+        else:
+            # Colored visualization mode
+            # ANSI color codes
+            RESET = "\033[0m"
+            RED = "\033[91m"
+            GREEN = "\033[92m"
+            YELLOW = "\033[93m"
+            BLUE = "\033[94m"
+            MAGENTA = "\033[95m"
+            CYAN = "\033[96m"
+            BG_GREEN = "\033[42m"
+            BG_RED = "\033[41m"
+
+            key_str = (
+                "The meaning of each symbol in the state is:\n"
+                f"{BG_GREEN}1{RESET}: Your snake head\n"
+                f"{GREEN}■{RESET}: Your snake body\n"
+                f"{BG_RED}2{RESET}: Enemy snake head\n"
+                f"{RED}■{RESET}: Enemy snake body\n"
+            )
+            key_str += f"{RED}●{RESET}: Apple\n" if self.num_apples > 0 else ""
+            key_str += f"{YELLOW}★{RESET}: Banana\n" if self.num_bananas > 0 else ""
+            key_str += f"{RED}†{RESET}: Fire\n" if self.num_fires > 0 else ""
+            key_str += "·: Empty space"
+
+            # Create empty board
+            board = [["·" for _ in range(self.width)] for _ in range(self.height)]
+
+            # Place apples
+            for ax, ay in self.apples:
+                if 0 <= ay < self.height and 0 <= ax < self.width:
+                    board[ay][ax] = f"{RED}●{RESET}"
+                    
+            # Place bananas
+            for bx, by in self.bananas:
+                if 0 <= by < self.height and 0 <= bx < self.width:
+                    board[by][bx] = f"{YELLOW}★{RESET}"
+                    
+            # Place fires
+            for fx, fy in self.fires:
+                if 0 <= fy < self.height and 0 <= fx < self.width:
+                    board[fy][fx] = f"{RED}†{RESET}"
+
+            # Place snakes
+            for i, (snake_id, snake_data) in enumerate(self.snakes.items(), start=1):
+                if not snake_data['alive']:
+                    continue
+
+                positions = snake_data['positions']
+                # Choose colors based on snake number
+                head_bg = BG_GREEN if i == 1 else BG_RED
+                body_color = GREEN if i == 1 else RED
                 
-        # Place bananas
-        for bx, by in self.bananas:
-            if 0 <= by < self.height and 0 <= bx < self.width:
-                board[by][bx] = 'B'
-                
-        # Place fires
-        for fx, fy in self.fires:
-            if 0 <= fy < self.height and 0 <= fx < self.width:
-                board[fy][fx] = 'F'
-
-        # Place snakes
-        for i, (snake_id, snake_data) in enumerate(self.snakes.items(), start=1):
-            if not snake_data['alive']:
-                continue
-
-            positions = snake_data['positions']
-            # Place snake body
-            for pos_idx, (x, y) in enumerate(positions):
-                if 0 <= y < self.height and 0 <= x < self.width:
-                    if pos_idx == 0:  # Head
-                        board[y][x] = str(i)  # Use snake number (1, 2, 3...) for head
-                    else:  # Body/tail
-                        board[y][x] = 'T'
+                # Place snake body
+                for pos_idx, (x, y) in enumerate(positions):
+                    if 0 <= y < self.height and 0 <= x < self.width:
+                        if pos_idx == 0:  # Head
+                            board[y][x] = f"{head_bg}{i}{RESET}"  # Use snake number (1, 2, 3...) for head
+                        else:  # Body/tail
+                            board[y][x] = f"{body_color}■{RESET}"
 
         # Build the string representation
         result = []

@@ -20,6 +20,7 @@ DEFAULT_NUM_FIRES = 0
 DEFAULT_FIRE_REWARD = 0
 DEFAULT_APPLE_REWARD = 1
 DEFAULT_HILL_DIRECTION = None
+DEFAULT_USE_COLOR = True  # Enable colored mode by default for interactive play
 # ------------------------------
 
 # --- Action Mapping ---
@@ -49,6 +50,7 @@ def parse_args():
     parser.add_argument('--hill-direction', type=str, choices=['up', 'down', 'left', 'right', 'none'], default=None, 
                         help='Direction for apples to roll (up, down, left, right, none)')
     parser.add_argument('--destroy-at-bottom', type=bool, default=False, help='Destroy apples at bottom of board (default: False)')
+    parser.add_argument('--no-color', action='store_true', help='Disable colored visualization')
     return parser.parse_args()
 
 # Helper function to get single character input without needing Enter
@@ -104,6 +106,9 @@ def play_game(args):
         print_axes=False
     )
 
+    # Store the color mode preference
+    use_color = not args.no_color
+
     print("Game settings:")
     print(f"  Board: {args.width}x{args.height}")
     print(f"  Apples: {args.apples} ({args.apple_reward} point{'' if args.apple_reward == 1 else 's'} each)")
@@ -112,6 +117,7 @@ def play_game(args):
     print(f"  Random snakes: {args.random_snakes}")
     print(f"  Hill direction: {hill_direction if hill_direction else 'None (apples stay in place)'}")
     print(f"  Max rounds: {args.rounds}")
+    print(f"  Colored visualization: {'enabled' if use_color else 'disabled'}")
 
     print("Resetting environment...")
     obs, info = env.reset() # Get initial state
@@ -126,11 +132,18 @@ def play_game(args):
         # 1. Render state
         print("\n" + "="*40)
         try:
-            print(env.game_state_text())
-            current_score = info.get('scores', {}).get(your_snake_id, 0)
-            print(f"Round: {info.get('round', 0)}")
-            print(f"Your Score ({your_snake_id}): {current_score}")
-            print(f"Total Reward: {total_reward:.2f}")
+            # Override the game state text to use color mode
+            if use_color:
+                print(env.game.render_text(print_axes=env.print_axes, use_color_mode=True))
+                print(f"\nRound: {info.get('round', 0)}")
+                print(f"Your Score ({your_snake_id}): {info.get('scores', {}).get(your_snake_id, 0)}")
+                print(f"Total Reward: {total_reward:.2f}")
+            else:
+                print(env.game_state_text())
+                current_score = info.get('scores', {}).get(your_snake_id, 0)
+                print(f"Round: {info.get('round', 0)}")
+                print(f"Your Score ({your_snake_id}): {current_score}")
+                print(f"Total Reward: {total_reward:.2f}")
             print("Enter move (w/a/s/d) or q to quit: ", end='', flush=True)
         except Exception as e:
             print(f"Error rendering state: {e}")

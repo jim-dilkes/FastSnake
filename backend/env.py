@@ -381,7 +381,7 @@ class FastSnakeEnv(gym.Env):
         components = []
         if self.print_coordinates:
             components.append(f"The board size is {self.width}x{self.height}. Normal (X, Y) coordinates are used to denote positions.\n"
-                              f"LEFT decreases X, RIGHT increases X, UP increases Y, and DOWN decreases Y.\n"
+                              f"Left decreases X, Right increases X, Up increases Y, and Down decreases Y.\n"
                               f"Coordinates range from (0, 0) at bottom left to ({self.width-1}, {self.height-1}) at top right.")
             if self.num_apples > 0:
                 components.append(f"Apples at: {', '.join(str(a) for a in apple_positions)} (worth {self.apple_reward} points each)")
