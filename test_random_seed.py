@@ -7,8 +7,8 @@ they produce identical states when running with random snakes.
 """
 
 import numpy as np
-from backend.env import FastSnakeEnv
-from backend.core import UP, DOWN, LEFT, RIGHT
+from src.env import FastSnakeEnv
+from src.core import UP, DOWN, LEFT, RIGHT
 
 def print_board(env, env_id=""):
     """Print a text representation of the board state."""

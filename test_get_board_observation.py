@@ -5,7 +5,7 @@ import os
 
 # Add the parent directory to the Python path so we can import the core module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from .backend.core import FastSnake
+from .src.core import FastSnake
 
 def verify_channel(obs, channel_idx, expected_positions):
     """Helper function to verify a channel contains exactly the expected positions."""

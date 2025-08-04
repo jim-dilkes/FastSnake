@@ -5,8 +5,8 @@ import tty
 import termios
 import argparse
 # Adjusted imports for running from modules/SnakeBench directory
-from backend.env import FastSnakeEnv
-from backend.core import UP, DOWN, LEFT, RIGHT # Import constants
+from src.env import FastSnakeEnv
+from src.core import UP, DOWN, LEFT, RIGHT # Import constants
 
 # --- Default Game Parameters ---
 DEFAULT_WIDTH = 10

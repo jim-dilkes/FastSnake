@@ -2,8 +2,8 @@
 Test script for rolling apples functionality in the FastSnake game.
 """
 
-from backend.env import FastSnakeEnv
-from backend.core import UP, DOWN, LEFT, RIGHT
+from src.env import FastSnakeEnv
+from src.core import UP, DOWN, LEFT, RIGHT
 
 def test_rolling_apples():
     """Test that apples roll down the hill in the specified direction."""

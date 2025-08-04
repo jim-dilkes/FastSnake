@@ -11,7 +11,7 @@ LEFT = 2
 RIGHT = 3
 
 class FastSnake:
-    """Optimized snake game implementation using NumPy arrays.
+    """Snake game implementation using NumPy arrays.
     
     Args:
         width: Width of the game board

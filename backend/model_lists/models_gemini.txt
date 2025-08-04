@@ -1,9 +1,0 @@
-gemini-2.0-flash
-gemini-2.0-flash-lite-preview-02-05
-gemini-1.5-flash
-gemini-1.5-flash-8b
-gemini-1.5-pro
-o3-mini
-gpt-4o-mini-2024-07-18
-deepseek-ai/DeepSeek-R1
-meta-llama/Meta-Llama-3-8B-Instruct-Turbo
