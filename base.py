@@ -140,8 +140,43 @@ You are controlling a snake in a multi-player Snake game
         except (IndexError, AttributeError):
             return None
 
-    def extract_action(self, action):
-        """Parse LLM output and optionally apply epsilon-greedy exploration.
+    @classmethod
+    def extract_action(cls, action):
+        """Parse LLM output (classmethod for evaluator compatibility).
+
+        This is the classmethod version used by the evaluator. It uses standard
+        action parsing (no multi-action reasoning, no epsilon-greedy).
+
+        For training with multi-action/epsilon, use extract_action_instance().
+
+        Returns:
+            full_action: Original LLM output
+            extracted_action: Parsed action before validation
+            valid_action: Action to execute
+            is_valid: Whether extraction succeeded
+            metrics: Dict with validity ratio
+        """
+        full_action = str(action)
+
+        # Standard mode: extract from <action>X</action>
+        extracted = FastSnakeLLMAgentsWrapper.extract_action_from_xml_tag(full_action)
+
+        if extracted is None:
+            extracted = "__invalid__"
+        is_valid = extracted in cls.language_action_space()
+        valid_action = extracted if is_valid else cls.default_action()
+
+        metrics = {
+            "behavior/valid_action_ratio": is_valid * 1.0,
+        }
+
+        return full_action, extracted, valid_action, is_valid, metrics
+
+    def extract_action_instance(self, action):
+        """Parse LLM output with instance-specific config (multi-action, epsilon).
+
+        This is the instance method version used during training.
+        Uses self.multi_action_reasoning and self.epsilon.
 
         Returns:
             full_action: Original LLM output
