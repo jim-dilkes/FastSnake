@@ -51,6 +51,8 @@ def parse_args():
                         help='Direction for apples to roll (up, down, left, right, none)')
     parser.add_argument('--destroy-at-bottom', type=bool, default=False, help='Destroy apples at bottom of board (default: False)')
     parser.add_argument('--no-color', action='store_true', help='Disable colored visualization')
+    parser.add_argument('--no-respawn', action='store_true', help='Disable respawn of objects (default: False)')
+    parser.add_argument('--seed', type=int, default=None, help='Random seed for environment initialization (default: None, uses random seed)')
     return parser.parse_args()
 
 # Helper function to get single character input without needing Enter
@@ -103,7 +105,8 @@ def play_game(args):
         destroy_at_bottom=args.destroy_at_bottom,
         print_visualization=True,
         print_coordinates=True,
-        print_axes=False
+        print_axes=False,
+        no_respawn=args.no_respawn
     )
 
     # Store the color mode preference
@@ -118,9 +121,10 @@ def play_game(args):
     print(f"  Hill direction: {hill_direction if hill_direction else 'None (apples stay in place)'}")
     print(f"  Max rounds: {args.rounds}")
     print(f"  Colored visualization: {'enabled' if use_color else 'disabled'}")
+    print(f"  Seed: {args.seed if args.seed is not None else 'None (random)'}")
 
     print("Resetting environment...")
-    obs, info = env.reset() # Get initial state
+    obs, info = env.reset(seed=args.seed) # Get initial state
     your_snake_id = env.external_snake_ids[0]
     done = False
     total_reward = 0
