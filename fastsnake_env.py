@@ -18,24 +18,26 @@ def make_fastsnake_env(env_name, task, config, render_mode=None):
 
     env = FastSnakeEnv(**fastsnake_kwargs)
 
-    # Prepare kwargs for the wrapper, checking prompt config first
+    # Prepare kwargs for the wrapper
     env_kwargs = dict(config.envs)
 
-    # Check if prompt config has environment_instruction (takes priority over config.envs.instruction_prompt)
-    if hasattr(config, 'prompt') and hasattr(config.prompt, 'prompt'):
-        environment_instruction = getattr(config.prompt.prompt, 'environment_instruction', None)
-        if environment_instruction is not None:
-            env_kwargs['instruction_prompt'] = environment_instruction
-
-    # Check for multi-action reasoning mode
+    # Check for multi-action reasoning mode and epsilon first
+    multi_action_reasoning = False
+    epsilon = 0.0
     if hasattr(config, 'prompt') and hasattr(config.prompt, 'prompt'):
         multi_action_reasoning = getattr(config.prompt.prompt, 'multi_action_reasoning', False)
-        env_kwargs['multi_action_reasoning'] = multi_action_reasoning
-
-    # Check for epsilon (exploration rate)
-    if hasattr(config, 'prompt') and hasattr(config.prompt, 'prompt'):
         epsilon = getattr(config.prompt.prompt, 'epsilon', 0.0)
-        env_kwargs['epsilon'] = epsilon
+
+    env_kwargs['multi_action_reasoning'] = multi_action_reasoning
+    env_kwargs['epsilon'] = epsilon
+
+    # Only use environment_instruction from config if NOT using multi-action reasoning
+    # When multi_action_reasoning=True, let the wrapper generate its own prompt
+    if not multi_action_reasoning:
+        if hasattr(config, 'prompt') and hasattr(config.prompt, 'prompt'):
+            environment_instruction = getattr(config.prompt.prompt, 'environment_instruction', None)
+            if environment_instruction is not None:
+                env_kwargs['instruction_prompt'] = environment_instruction
 
     env = FastSnakeLLMAgentsWrapper(env, **env_kwargs)
 
