@@ -44,9 +44,12 @@ class FastSnake:
                  num_fires: int = 2, 
                  fire_reward: int = -1, 
                  fire_rng=None,
+                 collision_reward: int = -1,
                  hill_direction: str = None,
                  destroy_at_bottom: bool = False,
-                 include_absent_objects: bool = True):
+                 include_absent_objects: bool = True,
+                 no_respawn: bool = False,
+                 terminate_on_single_snake: bool = True,):
         # Board representation constants
         self.EMPTY = 100
         self.SNAKE_BODY = 101
@@ -67,11 +70,13 @@ class FastSnake:
         self.num_fires = num_fires if num_fires is not None else 0
         self.include_fires = num_fires > 0
         self.fire_reward = fire_reward if fire_reward is not None else 0
+        self.collision_reward = collision_reward if collision_reward is not None else 0
         self.hill_direction = hill_direction
         self.destroy_at_bottom = destroy_at_bottom
         self.include_absent_objects = include_absent_objects
         self.num_object_types = self.include_apples + self.include_bananas + self.include_fires
-        
+        self.no_respawn = no_respawn
+        self.terminate_on_single_snake = terminate_on_single_snake
         # Validate hill_direction
         if hill_direction is not None:
             if hill_direction not in ["up", "down", "left", "right"]:
@@ -356,7 +361,7 @@ class FastSnake:
                 for snake_id in snake_ids:
                     if self.snakes[snake_id]['alive']:
                         self.snakes[snake_id]['alive'] = False
-                        rewards[snake_id] -= 1.0
+                        rewards[snake_id] += self.collision_reward
                         
         # ---- PHASE 3: Process individual snake moves and collisions ----
         success = {sid: False for sid in self.snakes}
@@ -370,14 +375,14 @@ class FastSnake:
             # Check bounds
             if not (0 <= x < self.width and 0 <= y < self.height):
                 snake['alive'] = False
-                rewards[snake_id] -= 1.0
+                rewards[snake_id] += self.collision_reward
                 continue
             
             # Check collisions with snake bodies on the current board
             # (This won't catch head-to-head collisions, which we handled above)
             if self.board[y, x] in [self.SNAKE_BODY, self.SNAKE_HEAD]:
                 snake['alive'] = False
-                rewards[snake_id] -= 1.0
+                rewards[snake_id] += self.collision_reward
                 continue
             
             # Move snake
@@ -397,7 +402,8 @@ class FastSnake:
                 self.scores[snake_id] += self.banana_reward
                 rewards[snake_id] += float(self.banana_reward)
                 self.bananas.remove(new_head)
-                self._place_banana()
+                if not self.no_respawn:
+                    self._place_banana()
                 if self.banana_reward > 0:
                     success[snake_id] = True
                 # Don't pop the tail - snake grows when eating a banana
@@ -406,7 +412,8 @@ class FastSnake:
                 self.scores[snake_id] += self.fire_reward
                 rewards[snake_id] += float(self.fire_reward)
                 self.fires.remove(new_head)
-                self._place_fire()
+                if not self.no_respawn:
+                    self._place_fire()
                 if self.fire_reward > 0:
                     success[snake_id] = True
                 # Don't pop the tail - snake grows when eating a fire
@@ -438,8 +445,10 @@ class FastSnake:
             self._update_board()
         
         # ---- PHASE 5: Respawn all apples that were eaten ----
-        for _ in range(apples_to_respawn):
-            self._place_apple()
+        # Only do this ground respawn for apples because only apples can be rolled down the hill
+        if not self.no_respawn:
+            for _ in range(apples_to_respawn):
+                self._place_apple()
             
         # Final board update after all changes
         self._update_board()
@@ -448,7 +457,7 @@ class FastSnake:
         
         # Check game over conditions
         alive_snakes = sum(s['alive'] for s in self.snakes.values())
-        self.game_over = (alive_snakes <= 1) or (self.round_number >= self.max_rounds)
+        self.game_over = (alive_snakes <= 1 and self.terminate_on_single_snake) or (alive_snakes == 0 and not self.terminate_on_single_snake) or (self.round_number >= self.max_rounds) 
         
         # Success is a boolean indicating whether any snake ate an item with positive reward
         return (

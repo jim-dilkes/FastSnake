@@ -1,28 +1,19 @@
 import random
+import gymnasium as gym
+from verl.envs.environments.FastSnake import ACTIONS
 
 
-ACTIONS = {
-    "up": "Move up (increase Y coordinate)",
-    "down": "Move down (decrease Y coordinate)",
-    "left": "Move left (decrease X coordinate)",
-    "right": "Move right (increase X coordinate)",
-}
-
-
-class FastSnakeLLMAgentsWrapper:
+class FastSnakeLLMAgentsWrapper(gym.Wrapper):
     """Wrapper for FastSnake environment that provides LLM-compatible interface.
 
     Supports two modes:
     1. Standard mode: Model outputs <action>X</action>
     2. Multi-action reasoning mode: Model outputs reasoning for each action,
        then <decision>X</decision>
-
-    Note: Does not inherit from gym.Wrapper since FastSnake uses old gym API.
     """
 
     def __init__(self, env, vlm=False, **kwargs):
-        self.env = env
-        self.language_action_space = list(ACTIONS.keys())
+        super().__init__(env)
         self.format_penalty = kwargs.get('format_penalty', 0.1)
 
         # Epsilon for epsilon-greedy exploration (0 = no random, 1 = always random)
@@ -66,36 +57,37 @@ Then, output your final decision:
 """
         else:
             instruction = f"""[Instructions]
-You are a helpful assistant controlling a snake in a grid-based game. You always respond by wrapping your thoughts in the correct XML tags. Your maximum response length: 200 words.
+You are a helpful assistant. You always respond by wrapping your thoughts in the correct XML tags. Your maximum response length: 200 words (tokens)
+You are controlling a snake in a multi-player Snake game
 
 [Available Actions]
 {action_strings}
 
-[Response Template]
-<think>Think about the current situation - what you should aim for and what to avoid</think>
-<plan>Describe your immediate plan and the specific action you will take</plan>
-<action>Your selected action from the list above</action>
-
 [Rules]
-- Eat apples to grow and score points
-- Avoid walls, your own body, and enemy snakes
+- You can move your head one space up, down, left, or right
+- If you move onto an apple, you get 1 point and you gain a body segment
+- You die if you move into a wall, another snake, or yourself
 """
         return instruction
 
-    def get_instruction_prompt(self, instructions=None, info=None):
+    def get_instruction_prompt(self):
         return self.instruction_prompt
 
     @property
     def max_steps(self):
         return getattr(self.env, 'max_rounds', 100)
 
-    @property
-    def default_action(self):
-        return self.language_action_space[0]
+    @classmethod
+    def language_action_space(cls):
+        return list(ACTIONS.keys())
 
-    @property
-    def actions(self):
-        return self.language_action_space
+    @classmethod
+    def default_action(cls):
+        return cls.actions()[0]
+
+    @classmethod
+    def actions(cls):
+        return cls.language_action_space()
 
     def __getattr__(self, name):
         return getattr(self.env, name)
@@ -103,8 +95,8 @@ You are a helpful assistant controlling a snake in a grid-based game. You always
     def restructure_obs(self, obs):
         return {
             'text': {
-                'long_term_context': self.env.game_state_text(),
-                'short_term_context': ''
+                'long_term_context': '',
+                'short_term_context': self.env.game_state_text()
             },
             'state': obs
         }
@@ -117,6 +109,8 @@ You are a helpful assistant controlling a snake in a grid-based game. You always
             action_int = action
 
         obs, reward, terminated, truncated, info = self.env.step(action_int)
+
+        info['action_was_valid'] = is_valid
         if not is_valid:
             reward = reward - self.format_penalty
         obs = self.restructure_obs(obs)
@@ -128,7 +122,7 @@ You are a helpful assistant controlling a snake in a grid-based game. You always
         return obs, info
 
     def get_text_action(self, action):
-        return self.language_action_space[action]
+        return self.language_action_space()[action]
 
     @staticmethod
     def extract_action_from_xml_tag(text: str, tag: str = "action") -> str:
@@ -164,13 +158,15 @@ You are a helpful assistant controlling a snake in a grid-based game. You always
         else:
             extracted = self.extract_action_from_xml_tag(full_action)
 
-        is_valid = extracted in self.language_action_space and extracted is not None
-        valid_action = extracted if is_valid else self.default_action
+        if extracted is None:
+            extracted = "__invalid__"
+        is_valid = extracted in self.language_action_space()
+        valid_action = extracted if is_valid else self.default_action()
 
         # Epsilon-greedy exploration: with probability epsilon, override with random action
         explored = False
         if self.epsilon > 0 and random.random() < self.epsilon:
-            valid_action = random.choice(self.language_action_space)
+            valid_action = random.choice(self.language_action_space())
             explored = True
 
         metrics = {
